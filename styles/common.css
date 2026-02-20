@@ -56,7 +56,7 @@ body {
 }
 
 .header .author a {
-  color: var(--accent-blue);
+  color: var(--accent-green);
   text-decoration: none;
   transition: color 0.2s;
 }
