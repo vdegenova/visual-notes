@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEQUOIA: Optimal Token Trees for Speculative Decoding</title>
+<meta property="og:title" content="SEQUOIA: Optimal Token Trees for Speculative Decoding">
+<meta property="og:description" content="How dynamic programming finds the perfect speculation tree shape for 4-10x faster LLM inference.">
+<meta property="og:url" content="https://vdegenova.github.io/visual-notes/visuals/sequoia/">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://vdegenova.github.io/visual-notes/images/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SEQUOIA: Optimal Token Trees for Speculative Decoding">
+<meta name="twitter:description" content="How dynamic programming finds the perfect speculation tree shape for 4-10x faster LLM inference.">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181a23;
+    --surface-2: #1e2030;
+    --border: #2a2d3e;
+    --text: #e2e4ed;
+    --text-dim: #8b8fa3;
+    --accent-blue: #5b8def;
+    --accent-green: #4ecb8d;
+    --accent-orange: #e8915a;
+    --accent-red: #ef6b6b;
+    --accent-cyan: #67d4e2;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 28px;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header p {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .card-bottleneck::before { background: var(--accent-red); }
+  .card-speculate::before { background: var(--accent-blue); }
+  .card-trees::before { background: var(--accent-orange); }
+  .card-optimal::before { background: var(--accent-cyan); }
+  .card-payoff::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+
+  .card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+
+  .card-bottleneck .card-label { color: var(--accent-red); }
+  .card-speculate .card-label { color: var(--accent-blue); }
+  .card-trees .card-label { color: var(--accent-orange); }
+  .card-optimal .card-label { color: var(--accent-cyan); }
+  .card-payoff .card-label { color: var(--accent-green); }
+
+  .card-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+  }
+
+  .card-subtitle {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  /* ===== Stats ===== */
+  .stats-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .card-bottleneck .stat-value { color: var(--accent-red); }
+  .card-speculate .stat-value { color: var(--accent-blue); }
+  .card-trees .stat-value { color: var(--accent-orange); }
+  .card-optimal .stat-value { color: var(--accent-cyan); }
+  .card-payoff .stat-value { color: var(--accent-green); }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* ===== Tags ===== */
+  .tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 5px 9px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+
+  .tag.pro { color: var(--accent-green); border-color: rgba(78, 203, 141, 0.25); }
+  .tag.con { color: var(--accent-red); border-color: rgba(239, 107, 107, 0.25); }
+
+  /* ===== Connector ===== */
+  .connector-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 0;
+    width: 100%;
+  }
+
+  .connector-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: var(--surface-2);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .connector-text .arrow-down { color: var(--accent-green); }
+
+  /* ===== Card 1: Decode Demo ===== */
+  .decode-demo {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .decode-demo-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  .token-seq {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .token {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    transition: all 0.3s;
+  }
+
+  .token.existing { background: var(--surface); color: var(--text); }
+  .token.generating {
+    background: rgba(78, 203, 141, 0.08);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+  .token.done {
+    background: rgba(78, 203, 141, 0.12);
+    border-color: rgba(78, 203, 141, 0.4);
+    color: var(--accent-green);
+  }
+  .token.pending { background: var(--surface); color: var(--text-dim); border-style: dashed; }
+  .token.accepted {
+    background: rgba(78, 203, 141, 0.15);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+  .token.rejected {
+    background: rgba(239, 107, 107, 0.1);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    text-decoration: line-through;
+  }
+  .token.draft {
+    background: rgba(91, 141, 239, 0.1);
+    border-color: rgba(91, 141, 239, 0.5);
+    color: var(--accent-blue);
+    border-style: dashed;
+  }
+
+  .model-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+
+  .cost-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .cost-high { background: rgba(239, 107, 107, 0.15); color: var(--accent-red); }
+  .cost-low { background: rgba(78, 203, 141, 0.1); color: var(--accent-green); }
+
+  .btn {
+    background: none;
+    border: 1px solid var(--accent-green);
+    color: var(--accent-green);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 12px;
+  }
+  .btn:hover { background: rgba(78, 203, 141, 0.1); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn.btn-blue { border-color: var(--accent-blue); color: var(--accent-blue); }
+  .btn.btn-blue:hover { background: rgba(91, 141, 239, 0.1); }
+
+  .stat-bar {
+    margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .stat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .stat-bar-label { color: var(--text-dim); width: 140px; font-size: 10px; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .stat-bar-val { color: var(--text); min-width: 28px; text-align: right; font-size: 11px; }
+
+  /* Callouts */
+  .callout {
+    border-left: 3px solid var(--accent-green);
+    padding: 12px 14px;
+    background: rgba(78, 203, 141, 0.04);
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+  .callout strong { color: var(--text); }
+  .callout em { color: var(--accent-green); font-style: normal; }
+  .callout.warn { border-color: var(--accent-red); background: rgba(239, 107, 107, 0.04); }
+  .callout.warn em { color: var(--accent-red); }
+  .callout.info { border-color: var(--accent-blue); background: rgba(91, 141, 239, 0.04); }
+  .callout.info em { color: var(--accent-blue); }
+
+  /* ===== Card 2: Spec Grid ===== */
+  .spec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .panel {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .timeline { position: relative; padding-left: 12px; }
+  .timeline-step {
+    position: relative;
+    padding: 8px 0 8px 18px;
+    border-left: 1px solid var(--border);
+  }
+  .timeline-step::before {
+    content: '';
+    position: absolute; left: -3.5px; top: 14px;
+    width: 6px; height: 6px;
+    border-radius: 50%; background: var(--border);
+  }
+  .step-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-dim);
+    margin-bottom: 2px; letter-spacing: 0.05em;
+  }
+  .step-content { font-size: 12px; line-height: 1.4; }
+  .step-model {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    padding: 1px 5px; border-radius: 3px; margin-right: 4px;
+  }
+  .model-big { background: rgba(239, 107, 107, 0.15); color: var(--accent-red); }
+  .model-small { background: rgba(91, 141, 239, 0.15); color: var(--accent-blue); }
+  .panel-stat {
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+  }
+
+  /* ===== Card 3: Tree Viz ===== */
+  .tree-container {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .tree-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .tree-tab {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tree-tab.active {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+  }
+  .tree-tab:hover { color: var(--text); }
+
+  svg.tree-svg { width: 100%; height: 240px; overflow: visible; }
+
+  .insight-box {
+    background: rgba(232, 145, 90, 0.06);
+    border: 1px solid rgba(232, 145, 90, 0.2);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.6;
+    margin-top: 14px;
+    color: var(--text-dim);
+  }
+  .insight-box strong { color: var(--accent-orange); }
+
+  /* ===== Card 4: DP Table ===== */
+  .dp-section {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .dp-explain {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+  .dp-explain strong { color: var(--text); }
+  .dp-explain .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent-blue);
+    background: rgba(91, 141, 239, 0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .dp-table-wrap { overflow-x: auto; margin-bottom: 14px; }
+  table.dp {
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    width: 100%;
+  }
+  table.dp th {
+    padding: 6px 10px;
+    background: var(--bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    text-align: center;
+    font-size: 10px;
+  }
+  table.dp td {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 48px;
+  }
+  table.dp td:hover { background: rgba(103, 212, 226, 0.08); }
+  table.dp td.optimal { background: rgba(103, 212, 226, 0.15); color: var(--accent-cyan); font-weight: 600; }
+
+  .dp-cell-explain {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    min-height: 36px;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.5;
+  }
+
+  /* ===== Card 5: Speedup ===== */
+  .speedup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .speedup-panel {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+  .speedup-panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .speedup-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--accent-green);
+  }
+  .speedup-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .result-demo {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .result-demo-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .result-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .result-bar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    width: 100px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .result-bar-track {
+    flex: 1;
+    height: 22px;
+    background: var(--surface);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .result-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    width: 0%;
+    transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .result-bar-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    width: 48px;
+    flex-shrink: 0;
+  }
+
+  .result-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  /* Innovation breakdown */
+  .innovation-bar-label {
+    width: 150px;
+  }
+
+  /* Paper reference */
+  .examples-section {
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .examples-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .example-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .example-title {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  a.example-title:hover { color: var(--accent-green); }
+  .example-authors {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .example-detail {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .example-stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--accent-green);
+  }
+
+  .footer {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    padding: 0 8px;
+  }
+
+  /* ===== Animations ===== */
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .pulsing { animation: pulse 1s infinite; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+  /* Scroll-triggered card reveals */
+  .card {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .card.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+    .pulsing { animation: none !important; }
+    .fade-in { animation: none !important; }
+    .result-bar-fill { transition: none !important; }
+    .bar-fill { transition: none !important; }
+    .token { transition: none !important; }
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 480px) {
+    body { padding: 32px 16px; }
+    .header h1 { font-size: 26px; }
+    .card { padding: 20px; }
+    .decode-demo { padding: 14px; }
+    .spec-grid { grid-template-columns: 1fr; }
+    .speedup-grid { grid-template-columns: 1fr; }
+    .speedup-number { font-size: 28px; }
+    .panel { padding: 12px; }
+    .tree-container { padding: 14px; }
+    svg.tree-svg { height: 200px; }
+    .dp-section { padding: 14px; }
+    table.dp { font-size: 10px; }
+    table.dp th { padding: 4px 6px; font-size: 9px; }
+    table.dp td { padding: 4px 6px; min-width: 38px; }
+    .stat-value { font-size: 13px; }
+    .stat-label { font-size: 11px; }
+    .tag { font-size: 10px; padding: 4px 7px; }
+    .connector-text { font-size: 10px; padding: 6px 14px; }
+    .footer { font-size: 12px; }
+    .result-bar-label { width: 70px; font-size: 9px; }
+    .innovation-bar-label { width: 100px; font-size: 9px; }
+    .result-bar-val { font-size: 10px; width: 40px; }
+    .step-content { font-size: 11px; }
+    .stat-bar-label { width: 110px; }
+  }
+
+  @media (max-width: 374px) {
+    .header h1 { font-size: 22px; }
+    .token { font-size: 10px; padding: 4px 7px; }
+    table.dp { font-size: 9px; }
+    table.dp td { min-width: 32px; padding: 3px 4px; }
+    table.dp th { font-size: 8px; padding: 3px 4px; }
+    .speedup-number { font-size: 24px; }
+    .result-bar-label { width: 60px; }
+    .innovation-bar-label { width: 80px; }
+  }
+</style>
+</head>
+<body>
+
+<a href="../../" style="display:inline-block;margin-bottom:24px;font-family:'DM Sans',sans-serif;font-size:14px;color:#8b8fa3;text-decoration:none;">&larr; Visual Notes</a>
+
+<div class="header">
+  <h1>SEQUOIA: Optimal Token Trees for Speculative Decoding</h1>
+  <p>LLMs generate tokens one at a time, bottlenecked by memory bandwidth. <strong>Speculative decoding</strong> uses a small model to draft tokens and a big model to verify them in parallel. SEQUOIA finds the mathematically optimal draft tree shape using dynamic programming.</p>
+</div>
+
+<!-- ===== CARD 1: THE BOTTLENECK ===== -->
+<div class="card card-bottleneck">
+  <div class="card-label">The Problem</div>
+  <div class="card-title">The Bottleneck</div>
+  <div class="card-subtitle">Every token requires a complete forward pass through all model parameters. This is brutally sequential &mdash; you can't generate token 5 until you have tokens 1&ndash;4.</div>
+
+  <div class="decode-demo">
+    <div class="decode-demo-label">Standard autoregressive decoding</div>
+    <div class="token-seq" id="std-seq">
+      <div class="token existing">"The</div>
+      <div class="token existing">model</div>
+      <div class="token existing">generates</div>
+      <div class="token pending">???</div>
+      <div class="token pending">???</div>
+      <div class="token pending">???</div>
+      <div class="token pending">???</div>
+    </div>
+    <div class="model-note">Each <span class="cost-tag cost-high">BIG MODEL CALL</span> produces exactly 1 token</div>
+    <button class="btn" id="std-btn" onclick="runStandardDecode()">Run Standard Decode</button>
+
+    <div class="stat-bar" style="margin-top:16px">
+      <div class="stat-bar-row">
+        <span class="stat-bar-label">Big model calls</span>
+        <div class="bar-track"><div class="bar-fill" id="calls-bar" style="width:0%;background:var(--accent-red)"></div></div>
+        <span class="stat-bar-val" id="calls-val">0</span>
+      </div>
+      <div class="stat-bar-row">
+        <span class="stat-bar-label">Tokens generated</span>
+        <div class="bar-track"><div class="bar-fill" id="tokens-bar" style="width:0%;background:var(--accent-green)"></div></div>
+        <span class="stat-bar-val" id="tokens-val">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <strong>The bottleneck:</strong> For a 70B parameter model, generating each token means reading <em>~140GB of weights</em>. The GPU spends most of its time on memory I/O, not actual compute.
+  </div>
+
+  <div class="callout info">
+    <strong>Key insight:</strong> Verifying a proposed token is <em>much cheaper</em> than generating one from scratch &mdash; and you can verify many tokens in a <em>single</em> forward pass.
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">1 token</span><span class="stat-label">Per forward pass</span></div>
+    <div class="stat"><span class="stat-value">~140 GB</span><span class="stat-label">Memory reads per token (70B)</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag con">&#x2717; Brutally sequential</span>
+    <span class="tag con">&#x2717; Memory-bound</span>
+  </div>
+</div>
+
+<!-- Connector 1 -->
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&#x2193;</span>
+    What if you could verify multiple tokens at once?
+    <span class="arrow-down">&#x2193;</span>
+  </div>
+</div>
+
+<!-- ===== CARD 2: SPECULATE & VERIFY ===== -->
+<div class="card card-speculate">
+  <div class="card-label">The Idea</div>
+  <div class="card-title">Speculate &amp; Verify</div>
+  <div class="card-subtitle">Use a tiny "draft" model to guess what the big model would say. Then verify multiple guesses in one shot &mdash; accept the good ones, throw away the bad ones.</div>
+
+  <div class="spec-grid">
+    <div class="panel">
+      <div class="panel-label">Without spec decoding</div>
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="step-label">STEP 1</div>
+          <div class="step-content"><span class="step-model model-big">70B</span> "tokens"</div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-label">STEP 2</div>
+          <div class="step-content"><span class="step-model model-big">70B</span> "one"</div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-label">STEP 3</div>
+          <div class="step-content"><span class="step-model model-big">70B</span> "at"</div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-label">STEP 4</div>
+          <div class="step-content"><span class="step-model model-big">70B</span> "a"</div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-label">STEP 5</div>
+          <div class="step-content"><span class="step-model model-big">70B</span> "time"</div>
+        </div>
+      </div>
+      <div class="panel-stat" style="color:var(--accent-red)">5 big model calls = 5 tokens</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">With spec decoding</div>
+      <div class="timeline">
+        <div class="timeline-step">
+          <div class="step-label">DRAFT (fast)</div>
+          <div class="step-content"><span class="step-model model-small">7B</span> guesses 5 tokens</div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-label">VERIFY (1 call!)</div>
+          <div class="step-content"><span class="step-model model-big">70B</span> checks all 5</div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-label">ACCEPT/REJECT</div>
+          <div class="step-content">Keep correct, discard wrong</div>
+        </div>
+      </div>
+      <div class="panel-stat" style="color:var(--accent-green)">1 big call &rarr; up to 5 tokens</div>
+    </div>
+  </div>
+
+  <div class="decode-demo">
+    <div class="decode-demo-label">Interactive: Spec decoding step-by-step</div>
+    <div style="margin-bottom:10px;font-size:12px;color:var(--text-dim)">Prefix: "The quick brown fox"</div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.05em;">DRAFT MODEL GUESSES (small, fast, sometimes wrong):</div>
+      <div class="token-seq" id="draft-tokens">
+        <div class="token existing">"The</div>
+        <div class="token existing">quick</div>
+        <div class="token existing">brown</div>
+        <div class="token existing">fox</div>
+        <div class="token draft" id="d1">jumps</div>
+        <div class="token draft" id="d2">over</div>
+        <div class="token draft" id="d3">a</div>
+        <div class="token draft" id="d4">lazy</div>
+        <div class="token draft" id="d5">cat</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.05em;">BIG MODEL VERIFICATION (single forward pass):</div>
+      <div class="token-seq" id="verify-tokens">
+        <div class="token existing">"The</div>
+        <div class="token existing">quick</div>
+        <div class="token existing">brown</div>
+        <div class="token existing">fox</div>
+        <div class="token pending" id="v1">?</div>
+        <div class="token pending" id="v2">?</div>
+        <div class="token pending" id="v3">?</div>
+        <div class="token pending" id="v4">?</div>
+        <div class="token pending" id="v5">?</div>
+      </div>
+    </div>
+
+    <button class="btn btn-blue" id="spec-btn" onclick="runSpecDecode()">Run Speculative Decode</button>
+
+    <div id="spec-result" style="margin-top:12px;font-size:13px;display:none" class="fade-in"></div>
+  </div>
+
+  <div class="callout">
+    <strong>Zero quality loss:</strong> The output distribution is <em>identical</em> to just using the big model. If the small model guesses wrong, the big model's correct token is used instead.
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">1 call</span><span class="stat-label">Verifies up to 5 tokens</span></div>
+    <div class="stat"><span class="stat-value">Exact</span><span class="stat-label">Output distribution preserved</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag pro">&#x2713; Parallel verification</span>
+    <span class="tag pro">&#x2713; Lossless</span>
+  </div>
+</div>
+
+<!-- Connector 2 -->
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&#x2193;</span>
+    Sequences waste tokens on a single bad guess &mdash;<br>what if you branch?
+    <span class="arrow-down">&#x2193;</span>
+  </div>
+</div>
+
+<!-- ===== CARD 3: WHY TREES? ===== -->
+<div class="card card-trees">
+  <div class="card-label">Token Trees</div>
+  <div class="card-title">Why Trees?</div>
+  <div class="card-subtitle">Instead of one guess-sequence, propose a branching tree of possibilities. The big model verifies the whole tree in one pass, accepting the longest valid path.</div>
+
+  <div class="tree-container">
+    <div class="decode-demo-label">Compare tree structures (same budget = 7 draft tokens)</div>
+    <div class="tree-tabs">
+      <button class="tree-tab active" onclick="showTree('seq', this)">Sequential</button>
+      <button class="tree-tab" onclick="showTree('kary', this)">K-ary (Medusa)</button>
+      <button class="tree-tab" onclick="showTree('sequoia', this)">SEQUOIA</button>
+    </div>
+
+    <svg class="tree-svg" id="tree-svg" viewBox="0 0 484 240"></svg>
+
+    <div id="tree-insight" class="insight-box"></div>
+  </div>
+
+  <div class="callout warn">
+    <strong>The sequential ceiling:</strong> If you draft 7 tokens in a chain, and position 1 is wrong, you get 0 bonus tokens. All that drafting was wasted. The ceiling is fixed by <em>P(first token correct)</em>.
+  </div>
+
+  <div class="callout">
+    <strong>Optimal trees branch where it matters most.</strong> Wide near the root (hedge your bets), narrow deeper (more confident). The shape is computed to maximize <em>expected accepted tokens</em> &mdash; not hardcoded.
+  </div>
+
+  <div class="tags">
+    <span class="tag pro">&#x2713; Multiple bets per position</span>
+    <span class="tag pro">&#x2713; Shape adapts to model</span>
+  </div>
+</div>
+
+<!-- Connector 3 -->
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&#x2193;</span>
+    But which tree shape is best?
+    <span class="arrow-down">&#x2193;</span>
+  </div>
+</div>
+
+<!-- ===== CARD 4: THE OPTIMAL SHAPE ===== -->
+<div class="card card-optimal">
+  <div class="card-label">Dynamic Programming</div>
+  <div class="card-title">The Optimal Shape</div>
+  <div class="card-subtitle">The tree shape that maximizes expected accepted tokens can't be brute-forced (exponentially many shapes). DP solves it optimally in polynomial time.</div>
+
+  <div class="dp-section">
+    <div class="dp-explain">
+      <p style="margin-bottom:10px;">The key question: given a budget of <strong>N</strong> draft tokens, what tree shape maximizes the expected number of tokens the big model accepts?</p>
+      <p style="margin-bottom:10px;"><strong>DP's trick:</strong> Any tree is made of subtrees. If you know the optimal subtree for size 3, you can build on it when solving for size 7. You never re-solve the same subproblem.</p>
+      <p style="margin-bottom:14px;">Each cell <span class="mono">T[n, b]</span> = "best expected tokens from a tree of size n, where root has b branches." Hover cells to explore.</p>
+    </div>
+
+    <div class="decode-demo-label">DP Table &mdash; hover a cell to understand it</div>
+    <div class="dp-table-wrap">
+      <table class="dp" id="dp-table">
+        <tr>
+          <th>Branches &#8595;&thinsp;/&thinsp;Size &#8594;</th>
+          <th>n=1</th><th>n=2</th><th>n=3</th><th>n=4</th><th>n=5</th><th>n=6</th><th>n=7</th>
+        </tr>
+      </table>
+    </div>
+    <div class="dp-cell-explain" id="dp-cell-explain">&larr; Hover a cell to see what it means</div>
+  </div>
+
+  <div class="callout">
+    <strong>Adapts to your model pair:</strong> A pair where the first token is usually accepted gives a shallow, wide tree. Fast-dropping acceptance rates give a deeper, narrower tree. <em>No hardcoded assumptions.</em>
+  </div>
+
+  <div class="callout info">
+    <strong>Free at inference time.</strong> You run this DP once offline. During serving, the tree shape is just a fixed lookup. <em>Zero overhead.</em>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">Polynomial</span><span class="stat-label">Time complexity</span></div>
+    <div class="stat"><span class="stat-value">Zero</span><span class="stat-label">Inference overhead</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag pro">&#x2713; Polynomial time</span>
+    <span class="tag pro">&#x2713; Zero inference overhead</span>
+  </div>
+</div>
+
+<!-- Connector 4 -->
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&#x2193;</span>
+    Optimal trees + sampling without replacement =
+    <span class="arrow-down">&#x2193;</span>
+  </div>
+</div>
+
+<!-- ===== CARD 5: THE PAYOFF ===== -->
+<div class="card card-payoff">
+  <div class="card-label">Results</div>
+  <div class="card-title">The Payoff</div>
+  <div class="card-subtitle">SEQUOIA's optimal tree shapes + sampling without replacement compound into significant real-world speedups.</div>
+
+  <div class="speedup-grid">
+    <div class="speedup-panel">
+      <div class="speedup-panel-label">Llama2-7B on A100</div>
+      <div class="speedup-number">4.04&times;</div>
+      <div class="speedup-sub">vs standard decoding</div>
+    </div>
+    <div class="speedup-panel">
+      <div class="speedup-panel-label">Llama3-70B offloading</div>
+      <div class="speedup-number">9.5&times;</div>
+      <div class="speedup-sub">vs DeepSpeed</div>
+    </div>
+  </div>
+
+  <div class="result-demo" id="latency-chart">
+    <div class="result-demo-label">Latency: Llama3-70B on a single L40 GPU</div>
+    <div class="result-bar-row">
+      <span class="result-bar-label">DeepSpeed</span>
+      <div class="result-bar-track"><div class="result-bar-fill" data-width="100" style="background:var(--accent-red)"></div></div>
+      <span class="result-bar-val" style="color:var(--accent-red)">5.7s</span>
+    </div>
+    <div class="result-bar-row">
+      <span class="result-bar-label">SEQUOIA</span>
+      <div class="result-bar-track"><div class="result-bar-fill" data-width="10.5" style="background:var(--accent-green)"></div></div>
+      <span class="result-bar-val" style="color:var(--accent-green)">0.60s</span>
+    </div>
+    <div class="result-note">Per-token latency. Offloading = model too big for GPU VRAM, pages from CPU RAM.</div>
+  </div>
+
+  <div class="result-demo" id="innovation-chart">
+    <div class="result-demo-label">The two innovations &mdash; impact breakdown</div>
+    <div class="result-bar-row">
+      <span class="result-bar-label innovation-bar-label">Optimal tree</span>
+      <div class="result-bar-track"><div class="result-bar-fill" data-width="33" style="background:var(--accent-orange)"></div></div>
+      <span class="result-bar-val" style="color:var(--accent-orange)">+33%</span>
+    </div>
+    <div class="result-bar-row">
+      <span class="result-bar-label innovation-bar-label">No-replacement</span>
+      <div class="result-bar-track"><div class="result-bar-fill" data-width="65" style="background:var(--accent-green)"></div></div>
+      <span class="result-bar-val" style="color:var(--accent-green)">+65%</span>
+    </div>
+    <div class="result-bar-row">
+      <span class="result-bar-label innovation-bar-label">Budget scaling</span>
+      <div class="result-bar-track"><div class="result-bar-fill" data-width="85" style="background:var(--accent-blue)"></div></div>
+      <span class="result-bar-val" style="color:var(--accent-blue)">unbounded</span>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">4.04&times;</span><span class="stat-label">On-chip speedup</span></div>
+    <div class="stat"><span class="stat-value">9.5&times;</span><span class="stat-label">Offloading speedup</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag pro">&#x2713; Scales with budget</span>
+    <span class="tag pro">&#x2713; No quality loss</span>
+  </div>
+
+  <div class="examples-section" style="margin-top: 20px;">
+    <div class="examples-label">Paper</div>
+    <div class="example-card">
+      <a class="example-title" href="https://arxiv.org/abs/2402.12374" target="_blank" rel="noopener">SEQUOIA: Scalable, Robust, and Hardware-aware Speculative Decoding</a>
+      <div class="example-authors">Chen et al., 2024</div>
+      <div class="example-detail">Optimal token tree construction via DP + sampling without replacement for <span class="example-stat">4&ndash;10&times; faster</span> LLM inference with <span class="example-stat">zero quality loss</span>.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  The pattern: don't generate what you can verify. Let a cheap model speculate, let the real model judge, and let dynamic programming find the optimal strategy.
+</div>
+
+<a href="../../" style="display:inline-block;margin-top:32px;font-family:'DM Sans',sans-serif;font-size:14px;color:#8b8fa3;text-decoration:none;">&larr; Visual Notes</a>
+
+<script>
+// ─── Utility ───
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── Card 1: Standard decode animation ───
+let stdRunning = false;
+async function runStandardDecode() {
+  if (stdRunning) return;
+  stdRunning = true;
+  document.getElementById('std-btn').disabled = true;
+
+  const words = ['one', 'at', 'a', 'time'];
+  const seq = document.getElementById('std-seq');
+
+  // reset
+  seq.querySelectorAll('.token:not(.existing)').forEach(t => t.remove());
+  for (let i = 0; i < 4; i++) {
+    const t = document.createElement('div');
+    t.className = 'token pending';
+    t.textContent = '???';
+    seq.appendChild(t);
+  }
+
+  const allTokens = seq.querySelectorAll('.token.pending');
+  let calls = 0, tokens = 0;
+
+  for (let i = 0; i < allTokens.length; i++) {
+    allTokens[i].className = 'token generating pulsing';
+    allTokens[i].textContent = '...';
+    await sleep(600);
+    calls++; tokens++;
+    updateBar('calls-bar', 'calls-val', calls, 4);
+    updateBar('tokens-bar', 'tokens-val', tokens, 4);
+    allTokens[i].className = 'token done';
+    allTokens[i].textContent = words[i];
+    await sleep(200);
+  }
+
+  stdRunning = false;
+  document.getElementById('std-btn').disabled = false;
+  document.getElementById('std-btn').textContent = 'Replay';
+}
+
+function updateBar(barId, valId, val, max) {
+  document.getElementById(barId).style.width = (val / max * 100) + '%';
+  document.getElementById(valId).textContent = val;
+}
+
+// ─── Card 2: Spec decode animation ───
+let specRunning = false;
+async function runSpecDecode() {
+  if (specRunning) return;
+  specRunning = true;
+  document.getElementById('spec-btn').disabled = true;
+
+  const ids = ['v1', 'v2', 'v3', 'v4', 'v5'];
+  const labels = ['jumps', 'over', 'a', 'lazy', 'cat'];
+  const correct = [true, true, false, false, false];
+
+  // Reset
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    el.className = 'token pending';
+    el.textContent = '?';
+  });
+  ['d1','d2','d3','d4','d5'].forEach(function(id, i) {
+    var el = document.getElementById(id);
+    el.className = 'token draft';
+    el.textContent = labels[i];
+  });
+  document.getElementById('spec-result').style.display = 'none';
+
+  // Phase 1: drafts highlight
+  await sleep(400);
+  for (let i = 0; i < 5; i++) {
+    document.getElementById('d' + (i + 1)).style.opacity = '1';
+    await sleep(150);
+  }
+
+  await sleep(600);
+
+  // Phase 2: parallel verification
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    el.className = 'token generating pulsing';
+    el.textContent = 'chk';
+  });
+  await sleep(800);
+
+  // Phase 3: accept/reject
+  let accepted = 0;
+  for (let i = 0; i < 5; i++) {
+    var el = document.getElementById(ids[i]);
+    if (correct[i]) {
+      el.className = 'token accepted';
+      el.textContent = labels[i];
+      accepted++;
+    } else {
+      el.className = 'token rejected';
+      el.textContent = labels[i];
+      await sleep(300);
+      break;
+    }
+    await sleep(300);
+  }
+
+  var resultEl = document.getElementById('spec-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML =
+    '<div style="color:var(--accent-green);font-family:\'JetBrains Mono\',monospace;font-size:10px;margin-bottom:6px;">RESULT</div>' +
+    '<div>1 big model call accepted <strong style="color:var(--accent-green)">' + accepted + ' tokens</strong> ("jumps over").</div>' +
+    '<div style="color:var(--text-dim);margin-top:4px;font-size:12px">Draft said "a" but big model would\'ve said "the". First wrong token stops. Big model\'s token used instead. Output distribution preserved.</div>';
+
+  specRunning = false;
+  document.getElementById('spec-btn').disabled = false;
+  document.getElementById('spec-btn').textContent = 'Replay';
+}
+
+// ─── Card 3: Tree viz ───
+var treeData = {
+  seq: {
+    nodes: [
+      {id:0, x:42, y:120, label:'fox', type:'root'},
+      {id:1, x:122, y:120, label:'jumps', type:'normal'},
+      {id:2, x:202, y:120, label:'over', type:'normal'},
+      {id:3, x:282, y:120, label:'the', type:'normal'},
+      {id:4, x:362, y:120, label:'lazy', type:'normal'},
+      {id:5, x:442, y:120, label:'dog', type:'normal'}
+    ],
+    edges: [[0,1],[1,2],[2,3],[3,4],[4,5]],
+    insight: '<strong>Sequential (chain):</strong> All tokens form one sequence. Only 1 option at each step. If token 1 is wrong, tokens 2\u20135 are wasted. Expected accepted tokens has a hard ceiling: 1/(1\u2212p\u2081).'
+  },
+  kary: {
+    nodes: [
+      {id:0, x:62, y:120, label:'fox', type:'root'},
+      {id:1, x:172, y:50, label:'jumps', type:'normal'},
+      {id:2, x:172, y:120, label:'leaps', type:'normal'},
+      {id:3, x:172, y:190, label:'runs', type:'normal'},
+      {id:4, x:302, y:50, label:'over', type:'normal'},
+      {id:5, x:302, y:190, label:'past', type:'normal'},
+      {id:6, x:412, y:50, label:'the', type:'normal'}
+    ],
+    edges: [[0,1],[0,2],[0,3],[1,4],[2,5],[4,6]],
+    insight: '<strong>K-ary / Medusa:</strong> Multiple options at first level (jumps/leaps/runs). Better first-token coverage, but the branching pattern is fixed/handcrafted. Doesn\'t adapt to actual acceptance probabilities.'
+  },
+  sequoia: {
+    nodes: [
+      {id:0, x:42, y:120, label:'fox', type:'root'},
+      {id:1, x:142, y:55, label:'jumps', type:'sequoia'},
+      {id:2, x:142, y:120, label:'leaps', type:'sequoia'},
+      {id:3, x:142, y:185, label:'runs', type:'sequoia'},
+      {id:4, x:252, y:35, label:'over', type:'sequoia'},
+      {id:5, x:252, y:85, label:'past', type:'sequoia'},
+      {id:6, x:362, y:35, label:'the', type:'sequoia'},
+      {id:7, x:362, y:85, label:'a', type:'sequoia'},
+      {id:8, x:452, y:50, label:'lazy', type:'sequoia'}
+    ],
+    edges: [[0,1],[0,2],[0,3],[1,4],[1,5],[4,6],[5,7],[6,8]],
+    insight: '<strong>SEQUOIA optimal:</strong> Wide near root (3 branches \u2014 hedge the first token), narrows as you go deeper (acceptance probability drops). This shape is computed by DP to maximize E[accepted tokens]. Adding more budget keeps helping \u2014 no ceiling.'
+  }
+};
+
+function showTree(type, btnEl) {
+  document.querySelectorAll('.tree-tab').forEach(function(t) { t.classList.remove('active'); });
+  if (btnEl) btnEl.classList.add('active');
+
+  var data = treeData[type];
+  var svg = document.getElementById('tree-svg');
+  svg.innerHTML = '';
+
+  // Draw edges
+  data.edges.forEach(function(edge) {
+    var na = data.nodes[edge[0]], nb = data.nodes[edge[1]];
+    var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', na.x); line.setAttribute('y1', na.y);
+    line.setAttribute('x2', nb.x); line.setAttribute('y2', nb.y);
+    line.setAttribute('stroke', type === 'sequoia' ? 'rgba(78,203,141,0.3)' : 'rgba(139,143,163,0.3)');
+    line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(line);
+  });
+
+  // Draw nodes
+  data.nodes.forEach(function(n) {
+    var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
+
+    var w = 48, h = 24;
+    var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', -w / 2); rect.setAttribute('y', -h / 2);
+    rect.setAttribute('width', w); rect.setAttribute('height', h);
+    rect.setAttribute('rx', '5');
+
+    var fill, stroke, textFill;
+    if (n.type === 'root') {
+      fill = 'rgba(239,107,107,0.15)'; stroke = 'rgba(239,107,107,0.5)'; textFill = '#ef6b6b';
+    } else if (n.type === 'sequoia') {
+      fill = 'rgba(78,203,141,0.1)'; stroke = 'rgba(78,203,141,0.5)'; textFill = '#4ecb8d';
+    } else {
+      fill = 'rgba(91,141,239,0.08)'; stroke = 'rgba(91,141,239,0.3)'; textFill = '#5b8def';
+    }
+
+    rect.setAttribute('fill', fill); rect.setAttribute('stroke', stroke);
+    rect.setAttribute('stroke-width', '1');
+    g.appendChild(rect);
+
+    var text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'central');
+    text.setAttribute('font-family', 'JetBrains Mono, monospace');
+    text.setAttribute('font-size', '10');
+    text.setAttribute('fill', textFill);
+    text.textContent = n.label;
+    g.appendChild(text);
+    svg.appendChild(g);
+  });
+
+  document.getElementById('tree-insight').innerHTML = data.insight;
+}
+showTree('seq', document.querySelector('.tree-tab'));
+
+// ─── Card 4: DP table ───
+function buildDPTable() {
+  var p = [0.7, 0.5, 0.35, 0.25, 0.18];
+  var N = 7, B = 4;
+  var T = [];
+  for (var i = 0; i <= N; i++) {
+    T[i] = [];
+    for (var j = 0; j <= B; j++) T[i][j] = -Infinity;
+  }
+  T[1][0] = 1;
+
+  for (var n = 2; n <= N; n++) {
+    for (var b = 1; b <= B; b++) {
+      for (var m = 1; m < n; m++) {
+        var bestM = -Infinity;
+        for (var k = 0; k <= B; k++) {
+          if (T[m][k] > bestM) bestM = T[m][k];
+        }
+        var prev = T[n - m][b - 1];
+        if (prev > -Infinity && bestM > -Infinity) {
+          var val = prev + p[b - 1] * bestM;
+          if (val > T[n][b]) T[n][b] = val;
+        }
+      }
+    }
+  }
+
+  // Find max per column
+  var colMax = [];
+  for (var n = 0; n <= N; n++) colMax[n] = -Infinity;
+  for (var n = 1; n <= N; n++) {
+    for (var b = 0; b <= B; b++) {
+      if (T[n][b] > colMax[n]) colMax[n] = T[n][b];
+    }
+  }
+
+  var table = document.getElementById('dp-table');
+  for (var b = 0; b <= B; b++) {
+    var row = document.createElement('tr');
+    var th = document.createElement('th');
+    th.textContent = b === 0 ? 'root only' : 'b=' + b;
+    row.appendChild(th);
+    for (var n = 1; n <= N; n++) {
+      var td = document.createElement('td');
+      var val = T[n][b];
+      if (val <= -Infinity) {
+        td.textContent = '\u2014';
+        td.style.color = '#333';
+      } else {
+        td.textContent = val.toFixed(2);
+        if (Math.abs(val - colMax[n]) < 0.001) td.className = 'optimal';
+      }
+      (function(n, b, val, colMax) {
+        td.addEventListener('mouseenter', function() {
+          var el = document.getElementById('dp-cell-explain');
+          if (val <= -Infinity) {
+            el.textContent = 'Invalid: can\'t have ' + b + ' branches with only ' + n + ' nodes.';
+          } else {
+            var isOpt = Math.abs(val - colMax[n]) < 0.001;
+            el.innerHTML = 'T[' + n + ',' + b + '] = <span style="color:var(--accent-cyan)">' + val.toFixed(3) + '</span> expected tokens \u2014 tree with ' + n + ' nodes, root has ' + b + ' branch' + (b !== 1 ? 'es' : '') + '. ' + (isOpt ? '<span style="color:var(--accent-orange)">\u2605 Optimal for this budget.</span>' : '');
+          }
+        });
+      })(n, b, val, colMax);
+      row.appendChild(td);
+    }
+    table.appendChild(row);
+  }
+}
+buildDPTable();
+
+// ─── Scroll-triggered animations ───
+// Card reveal
+var cardObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('revealed');
+      cardObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.card').forEach(function(card) {
+  cardObserver.observe(card);
+});
+
+// Result bars animate on scroll
+var barObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      var bars = entry.target.querySelectorAll('.result-bar-fill');
+      bars.forEach(function(bar) {
+        bar.style.width = bar.dataset.width + '%';
+      });
+      barObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+document.querySelectorAll('.result-demo').forEach(function(demo) {
+  barObserver.observe(demo);
+});
+</script>
+
+</body>
+</html>
