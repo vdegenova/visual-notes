@@ -50,6 +50,21 @@ body {
   line-height: 1.6;
 }
 
+.header .author {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.header .author a {
+  color: var(--accent-blue);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.header .author a:hover {
+  color: var(--accent-cyan);
+}
+
 .visuals-grid {
   display: flex;
   flex-direction: column;
