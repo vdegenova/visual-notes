@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Evolution of Attention</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181a23;
+    --surface-2: #1e2030;
+    --border: #2a2d3e;
+    --text: #e2e4ed;
+    --text-dim: #8b8fa3;
+    --accent-blue: #5b8def;
+    --accent-green: #4ecb8d;
+    --accent-orange: #e8915a;
+    --accent-red: #ef6b6b;
+    --accent-cyan: #67d4e2;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 28px;
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, var(--text) 0%, var(--text-dim) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .card-standard::before { background: var(--accent-red); }
+  .card-linear::before { background: var(--accent-blue); }
+  .card-sparse::before { background: var(--accent-orange); }
+  .card-hybrid::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+
+  .card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+
+  .card-standard .card-label { color: var(--accent-red); }
+  .card-linear .card-label { color: var(--accent-blue); }
+  .card-sparse .card-label { color: var(--accent-orange); }
+  .card-hybrid .card-label { color: var(--accent-green); }
+
+  .card-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+  }
+
+  .card-subtitle {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  /* Matrix with axes */
+  .matrix-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .matrix-x-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 6px;
+  }
+
+  .matrix-with-y {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .matrix-y-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+  }
+
+  .matrix-grid-area {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .matrix-tick-row {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+
+  .matrix-tick {
+    width: 32px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-align: center;
+    opacity: 0.6;
+  }
+
+  .matrix-body { display: flex; }
+
+  .matrix-tick-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-right: 4px;
+  }
+
+  .matrix-tick-col .matrix-tick {
+    width: auto;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .matrix-grid {
+    display: grid;
+    gap: 3px;
+  }
+
+  .matrix-grid.size-8 { grid-template-columns: repeat(8, 1fr); }
+
+  .matrix-cell {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+  }
+
+  .card-standard .matrix-cell { background: var(--accent-red); }
+  .card-standard .matrix-cell.hot { opacity: 0.9; }
+  .card-standard .matrix-cell.warm { opacity: 0.5; }
+  .card-standard .matrix-cell.cool { opacity: 0.2; }
+
+  .card-sparse .matrix-cell { background: var(--accent-orange); }
+  .card-sparse .matrix-cell.active { opacity: 0.9; }
+  .card-sparse .matrix-cell.off { opacity: 0.05; }
+
+  /* Linear attention visual — NOT a full matrix */
+  .linear-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+
+  .linear-diagram {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .linear-matrix-tall {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3px;
+  }
+
+  .linear-matrix-tall .lcell {
+    width: 28px;
+    height: 32px;
+    border-radius: 4px;
+    background: var(--accent-blue);
+  }
+
+  .linear-matrix-wide {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
+  }
+
+  .linear-matrix-wide .lcell {
+    width: 32px;
+    height: 22px;
+    border-radius: 4px;
+    background: var(--accent-blue);
+  }
+
+  .linear-op {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  .linear-label-row {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+  }
+
+  .linear-dim-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  .linear-dim-label span {
+    color: var(--accent-blue);
+    font-weight: 600;
+  }
+
+  .linear-explanation {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    line-height: 1.5;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .card-standard .stat-value { color: var(--accent-red); }
+  .card-linear .stat-value { color: var(--accent-blue); }
+  .card-sparse .stat-value { color: var(--accent-orange); }
+  .card-hybrid .stat-value { color: var(--accent-green); }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 5px 9px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+
+  .tag.pro { color: var(--accent-green); border-color: rgba(78, 203, 141, 0.25); }
+  .tag.con { color: var(--accent-red); border-color: rgba(239, 107, 107, 0.25); }
+
+  /* Connector */
+  .connector-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 0;
+    width: 100%;
+  }
+
+  .connector-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: var(--surface-2);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .connector-text .arrow-down { color: var(--accent-green); }
+
+  /* Hybrid flow */
+  .hybrid-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .flow-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    min-width: 100px;
+    flex: 1;
+    max-width: 200px;
+  }
+
+  .flow-block-icon { font-size: 20px; }
+
+  .flow-block-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .flow-block-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .flow-block.router { border-color: var(--accent-green); }
+  .flow-block.router .flow-block-label { color: var(--accent-green); }
+
+  /* Match colors to attention types above */
+  .flow-block.sparse-b { border-color: var(--accent-orange); }
+  .flow-block.sparse-b .flow-block-label { color: var(--accent-orange); }
+
+  .flow-block.linear-b { border-color: var(--accent-blue); }
+  .flow-block.linear-b .flow-block-label { color: var(--accent-blue); }
+
+  .flow-block.output-b { border-color: var(--accent-cyan); }
+  .flow-block.output-b .flow-block-label { color: var(--accent-cyan); }
+
+  .flow-arrow-down {
+    font-size: 20px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  .flow-split-arrows {
+    font-size: 16px;
+    color: var(--text-dim);
+    text-align: center;
+    letter-spacing: 16px;
+    padding-left: 16px;
+  }
+
+  .hybrid-tags {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  /* Examples */
+  .examples-section {
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .examples-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+
+  .example-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+  }
+
+  .example-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .example-authors {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .example-detail {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .example-stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--accent-green);
+  }
+
+  .footer {
+    margin-top: 28px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    padding: 0 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>How Attention Is Evolving</h1>
+  <p>Self-attention scales quadratically — every token scores against every other token. The field is converging on hybrid routing to break that wall.</p>
+</div>
+
+<!-- STANDARD ATTENTION -->
+<div class="card card-standard">
+  <div class="card-label">Standard Attention</div>
+  <div class="card-title">Compute Everything</div>
+  <div class="card-subtitle">Every token attends to every other token. Full n×n matrix.</div>
+  <div class="matrix-wrapper">
+    <div class="matrix-x-label">Keys (tokens)</div>
+    <div class="matrix-with-y">
+      <div class="matrix-y-label">Queries (tokens)</div>
+      <div class="matrix-grid-area">
+        <div class="matrix-tick-row">
+          <div class="matrix-tick">t₁</div><div class="matrix-tick">t₂</div><div class="matrix-tick">t₃</div><div class="matrix-tick">t₄</div><div class="matrix-tick">t₅</div><div class="matrix-tick">t₆</div><div class="matrix-tick">t₇</div><div class="matrix-tick">t₈</div>
+        </div>
+        <div class="matrix-body">
+          <div class="matrix-tick-col">
+            <div class="matrix-tick">t₁</div><div class="matrix-tick">t₂</div><div class="matrix-tick">t₃</div><div class="matrix-tick">t₄</div><div class="matrix-tick">t₅</div><div class="matrix-tick">t₆</div><div class="matrix-tick">t₇</div><div class="matrix-tick">t₈</div>
+          </div>
+          <div class="matrix-grid size-8" id="standard-matrix"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">O(n²)</span><span class="stat-label">Complexity</span></div>
+    <div class="stat"><span class="stat-value">~16B</span><span class="stat-label">Scores @ 128K context</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag pro">✓ Exact</span>
+    <span class="tag con">✗ Brutal at scale</span>
+  </div>
+</div>
+
+<!-- LINEAR ATTENTION -->
+<div class="card card-linear">
+  <div class="card-label">Linear Attention</div>
+  <div class="card-title">Approximate Everything</div>
+  <div class="card-subtitle">Never builds the full n×n matrix. Uses a kernel trick to decompose into two smaller matrices.</div>
+  <div class="linear-visual">
+    <div class="linear-diagram">
+      <div>
+        <div class="linear-matrix-tall" id="linear-tall"></div>
+      </div>
+      <div class="linear-op">×</div>
+      <div>
+        <div class="linear-matrix-wide" id="linear-wide"></div>
+      </div>
+    </div>
+    <div class="linear-label-row">
+      <div class="linear-dim-label"><span>n × d</span><br>φ(Q)</div>
+      <div class="linear-dim-label"><span>d × n</span><br>φ(K)ᵀV</div>
+    </div>
+    <div class="linear-explanation">
+      Instead of n×n scores, accumulate a<br>small d×d state — scales linearly with n
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">O(n)</span><span class="stat-label">Complexity</span></div>
+    <div class="stat"><span class="stat-value">~128K</span><span class="stat-label">Scores @ 128K context</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag pro">✓ Fast</span>
+    <span class="tag con">✗ Imprecise</span>
+  </div>
+</div>
+
+<!-- SPARSE ATTENTION -->
+<div class="card card-sparse">
+  <div class="card-label">Sparse Attention</div>
+  <div class="card-title">Compute What Matters</div>
+  <div class="card-subtitle">Only compute scores for important token pairs. Precise but hard to route.</div>
+  <div class="matrix-wrapper">
+    <div class="matrix-x-label">Keys (tokens)</div>
+    <div class="matrix-with-y">
+      <div class="matrix-y-label">Queries (tokens)</div>
+      <div class="matrix-grid-area">
+        <div class="matrix-tick-row">
+          <div class="matrix-tick">t₁</div><div class="matrix-tick">t₂</div><div class="matrix-tick">t₃</div><div class="matrix-tick">t₄</div><div class="matrix-tick">t₅</div><div class="matrix-tick">t₆</div><div class="matrix-tick">t₇</div><div class="matrix-tick">t₈</div>
+        </div>
+        <div class="matrix-body">
+          <div class="matrix-tick-col">
+            <div class="matrix-tick">t₁</div><div class="matrix-tick">t₂</div><div class="matrix-tick">t₃</div><div class="matrix-tick">t₄</div><div class="matrix-tick">t₅</div><div class="matrix-tick">t₆</div><div class="matrix-tick">t₇</div><div class="matrix-tick">t₈</div>
+          </div>
+          <div class="matrix-grid size-8" id="sparse-matrix"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">O(n√n)</span><span class="stat-label">Complexity</span></div>
+    <div class="stat"><span class="stat-value">~varies</span><span class="stat-label">Scores @ 128K context</span></div>
+  </div>
+  <div class="tags">
+    <span class="tag pro">✓ Precise</span>
+    <span class="tag con">✗ Hard to target</span>
+  </div>
+</div>
+
+<!-- Connector -->
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">↓</span>
+    None alone is enough —<br>what if you combine them?
+    <span class="arrow-down">↓</span>
+  </div>
+</div>
+
+<!-- HYBRID -->
+<div class="card card-hybrid">
+  <div class="card-label">The New Frontier</div>
+  <div class="card-title">Hybrid Attention Routing</div>
+  <div class="card-subtitle">Train a router to dynamically assign each computation — exact attention where it matters, cheap approximation everywhere else.</div>
+
+  <div class="hybrid-flow">
+    <div class="flow-block" style="max-width: 260px;">
+      <div class="flow-block-icon">📥</div>
+      <div class="flow-block-label">Input</div>
+      <div class="flow-block-desc">Token pairs per layer</div>
+    </div>
+
+    <div class="flow-arrow-down">↓</div>
+
+    <div class="flow-block router" style="max-width: 260px;">
+      <div class="flow-block-icon">🧠</div>
+      <div class="flow-block-label">Learned Router</div>
+      <div class="flow-block-desc">Decides per token pair or per layer</div>
+    </div>
+
+    <div class="flow-split-arrows">↙ ↘</div>
+
+    <div class="flow-row">
+      <div class="flow-block sparse-b">
+        <div class="flow-block-label">Sparse</div>
+        <div class="flow-block-desc">Exact softmax<br>High-importance</div>
+      </div>
+      <div class="flow-block linear-b">
+        <div class="flow-block-label">Linear</div>
+        <div class="flow-block-desc">Cheap approx<br>Low-importance</div>
+      </div>
+    </div>
+
+    <div class="flow-split-arrows">↘ ↙</div>
+
+    <div class="flow-block output-b" style="max-width: 260px;">
+      <div class="flow-block-icon">⚡</div>
+      <div class="flow-block-label">Blended Output</div>
+    </div>
+  </div>
+
+  <div class="hybrid-tags">
+    <span class="tag pro">✓ Precise where it matters</span>
+    <span class="tag pro">✓ Cheap everywhere else</span>
+    <span class="tag pro">✓ Model learns the split</span>
+  </div>
+
+  <div class="examples-section">
+    <div class="examples-label">Recent examples</div>
+    <div class="example-card">
+      <div class="example-title">SLA2</div>
+      <div class="example-authors">Zhang et al., Feb 2026</div>
+      <div class="example-detail">Learned router for video diffusion. <span class="example-stat">97% sparsity</span>, <span class="example-stat">18.6× attention speedup</span>, minimal quality degradation.</div>
+    </div>
+    <div class="example-card">
+      <div class="example-title">MiniCPM-SALA</div>
+      <div class="example-authors">MiniCPM Team, Feb 2026</div>
+      <div class="example-detail">Deterministic per-layer routing for LLMs. <span class="example-stat">1:3 sparse-to-linear ratio</span>, <span class="example-stat">~75% training cost reduction</span>.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Same pattern as MoE, speculative decoding, and adaptive compute: let the model decide where to spend its budget.
+</div>
+
+<script>
+function fillStandardMatrix() {
+  const grid = document.getElementById('standard-matrix');
+  const pattern = [
+    [3,2,1,1,0,0,0,1],
+    [2,3,2,1,0,0,1,0],
+    [1,2,3,2,1,0,0,0],
+    [1,1,2,3,2,1,0,0],
+    [0,0,1,2,3,2,1,1],
+    [0,0,0,1,2,3,2,1],
+    [0,1,0,0,1,2,3,2],
+    [1,0,0,0,1,1,2,3],
+  ];
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      const v = pattern[i][j];
+      if (v === 3) cell.classList.add('hot');
+      else if (v === 2) cell.classList.add('warm');
+      else cell.classList.add('cool');
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function fillLinearTall() {
+  const grid = document.getElementById('linear-tall');
+  // 8 rows × 2 cols — representing φ(Q): n×d where d is small
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 2; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'lcell';
+      cell.style.opacity = 0.3 + Math.random() * 0.5;
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function fillLinearWide() {
+  const grid = document.getElementById('linear-wide');
+  // 2 rows × 8 cols — representing φ(K)ᵀV: d×n
+  for (let i = 0; i < 2; i++) {
+    for (let j = 0; j < 8; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'lcell';
+      cell.style.opacity = 0.3 + Math.random() * 0.5;
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function fillSparseMatrix() {
+  const grid = document.getElementById('sparse-matrix');
+  const activeSet = new Set([
+    '0,0','1,1','2,2','3,3','4,4','5,5','6,6','7,7',
+    '0,1','1,0','2,3','3,2','4,5','5,4','6,7','7,6',
+    '0,7','7,0','3,6','6,3',
+  ]);
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const cell = document.createElement('div');
+      cell.className = 'matrix-cell';
+      if (activeSet.has(`${i},${j}`)) cell.classList.add('active');
+      else cell.classList.add('off');
+      grid.appendChild(cell);
+    }
+  }
+}
+
+fillStandardMatrix();
+fillLinearTall();
+fillLinearWide();
+fillSparseMatrix();
+</script>
+</body>
+</html>
