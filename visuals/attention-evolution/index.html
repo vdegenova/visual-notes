@@ -508,6 +508,92 @@
     padding: 0 8px;
   }
 
+  /* ===== Scroll-triggered animations ===== */
+  .matrix-cell,
+  .lcell {
+    opacity: 0 !important;
+    transition: opacity 0.4s ease;
+  }
+
+  .revealed .matrix-cell,
+  .revealed .lcell {
+    /* JS sets target opacity via inline style or class */
+  }
+
+  .card-standard.revealed .matrix-cell.hot { opacity: 0.9 !important; }
+  .card-standard.revealed .matrix-cell.warm { opacity: 0.5 !important; }
+  .card-standard.revealed .matrix-cell.cool { opacity: 0.2 !important; }
+
+  .card-sparse.revealed .matrix-cell.active { opacity: 0.9 !important; }
+  .card-sparse.revealed .matrix-cell.off { opacity: 0.05 !important; }
+
+  .card-linear.revealed .lcell { opacity: var(--cell-opacity, 0.5) !important; }
+
+  /* Hybrid flow cascade */
+  .hybrid-flow .flow-block,
+  .hybrid-flow .flow-arrow-down,
+  .hybrid-flow .flow-split-arrows,
+  .hybrid-flow .flow-row {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  .card-hybrid.revealed .flow-block,
+  .card-hybrid.revealed .flow-arrow-down,
+  .card-hybrid.revealed .flow-split-arrows,
+  .card-hybrid.revealed .flow-row {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Linear matrices slide in */
+  .linear-visual .linear-diagram > div:first-child {
+    opacity: 0;
+    transform: translateX(-16px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .linear-visual .linear-diagram > div:last-child {
+    opacity: 0;
+    transform: translateX(16px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .linear-visual .linear-op {
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .card-linear.revealed .linear-diagram > div:first-child {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .card-linear.revealed .linear-diagram > div:last-child {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .card-linear.revealed .linear-op {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .matrix-cell,
+    .lcell,
+    .hybrid-flow .flow-block,
+    .hybrid-flow .flow-arrow-down,
+    .hybrid-flow .flow-split-arrows,
+    .hybrid-flow .flow-row,
+    .linear-visual .linear-diagram > div,
+    .linear-visual .linear-op {
+      opacity: unset !important;
+      transform: none !important;
+      transition: none !important;
+    }
+  }
+
   @media (max-width: 480px) {
     body {
       padding: 32px 16px;
@@ -914,6 +1000,51 @@ fillStandardMatrix();
 fillLinearTall();
 fillLinearWide();
 fillSparseMatrix();
+
+// Stagger transition-delays on matrix cells
+document.querySelectorAll('#standard-matrix .matrix-cell').forEach((cell, idx) => {
+  const row = Math.floor(idx / 8);
+  const col = idx % 8;
+  cell.style.transitionDelay = ((row + col) * 40) + 'ms'; // diagonal wave
+});
+
+document.querySelectorAll('#sparse-matrix .matrix-cell').forEach((cell, idx) => {
+  const row = Math.floor(idx / 8);
+  const col = idx % 8;
+  // Active cells get staggered delay, inactive cells appear instantly
+  if (cell.classList.contains('active')) {
+    cell.style.transitionDelay = ((row + col) * 50) + 'ms';
+  } else {
+    cell.style.transitionDelay = '0ms';
+  }
+});
+
+// Store random opacity on linear cells as CSS custom property
+document.querySelectorAll('.lcell').forEach(cell => {
+  cell.style.setProperty('--cell-opacity', cell.style.opacity || '0.5');
+});
+
+// Linear × operator and matrices get staggered delays
+document.querySelector('.linear-visual .linear-diagram > div:first-child').style.transitionDelay = '0ms';
+document.querySelector('.linear-visual .linear-op').style.transitionDelay = '150ms';
+document.querySelector('.linear-visual .linear-diagram > div:last-child').style.transitionDelay = '300ms';
+
+// Hybrid flow cascade — stagger each child element
+document.querySelectorAll('.hybrid-flow > *').forEach((el, idx) => {
+  el.style.transitionDelay = (idx * 80) + 'ms';
+});
+
+// IntersectionObserver: add .revealed when card scrolls into view
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('revealed');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.2 });
+
+document.querySelectorAll('.card').forEach(card => observer.observe(card));
 </script>
 
 <a href="../../" style="display:inline-block;margin-top:32px;font-family:'DM Sans',sans-serif;font-size:14px;color:#8b8fa3;text-decoration:none;">&larr; Visual Notes</a>
