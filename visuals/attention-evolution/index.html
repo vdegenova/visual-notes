@@ -566,24 +566,32 @@
       grid-template-rows: repeat(8, 1fr);
     }
 
-    /* Linear diagram: fluid wide matrix cells */
-    .linear-matrix-wide .lcell {
-      width: auto;
-      height: 18px;
+    /* Linear diagram: fluid layout */
+    .linear-diagram {
+      width: 100%;
     }
 
-    .linear-matrix-wide {
-      width: 100%;
-      flex: 1;
+    .linear-matrix-tall {
+      flex-shrink: 0;
     }
 
     .linear-matrix-tall .lcell {
-      width: 22px;
-      height: 26px;
+      width: 20px;
+      height: 24px;
     }
 
-    .linear-diagram {
-      width: 100%;
+    .linear-op {
+      flex-shrink: 0;
+    }
+
+    .linear-matrix-wide {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .linear-matrix-wide .lcell {
+      width: auto;
+      height: 18px;
     }
 
     /* Flow blocks */
