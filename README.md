@@ -6,7 +6,7 @@ Self-contained technical diagrams and infographics. Hosted on GitHub Pages.
 
 ## Adding a new visual
 
-1. Create a directory: `mkdir my-visual/`
+1. Create a directory: `mkdir visuals/my-visual/`
 2. Add a self-contained `index.html` inside it (inline styles + JS, no external deps beyond Google Fonts)
-3. Add a card entry in the root `index.html` linking to `./my-visual/`
+3. Add a card entry in the root `index.html` linking to `./visuals/my-visual/`
 4. Push to `main` — GitHub Pages deploys automatically
