@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Evolution of Attention</title>
+<meta property="og:title" content="How Attention Is Evolving">
+<meta property="og:description" content="From quadratic self-attention to hybrid routing — visualizing the design space.">
+<meta property="og:url" content="https://vdegenova.github.io/visual-notes/visuals/attention-evolution/">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="How Attention Is Evolving">
+<meta name="twitter:description" content="From quadratic self-attention to hybrid routing — visualizing the design space.">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -490,6 +497,148 @@
     color: var(--text-dim);
     line-height: 1.6;
     padding: 0 8px;
+  }
+
+  @media (max-width: 480px) {
+    body {
+      padding: 32px 16px;
+    }
+
+    .header h1 {
+      font-size: 26px;
+    }
+
+    .card {
+      padding: 20px;
+    }
+
+    /* Matrix cells: fluid instead of fixed 32px */
+    .matrix-cell {
+      width: auto;
+      height: auto;
+      aspect-ratio: 1;
+    }
+
+    .matrix-tick {
+      width: auto;
+      font-size: 8px;
+    }
+
+    .matrix-tick-col .matrix-tick {
+      height: auto;
+      aspect-ratio: 1;
+      font-size: 8px;
+    }
+
+    .matrix-grid.size-8 {
+      grid-template-columns: repeat(8, 1fr);
+      width: 100%;
+    }
+
+    .matrix-grid-area {
+      width: 100%;
+    }
+
+    .matrix-tick-row {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+    }
+
+    .matrix-body {
+      width: 100%;
+    }
+
+    .matrix-grid {
+      flex: 1;
+    }
+
+    .matrix-tick-col {
+      display: grid;
+      grid-template-rows: repeat(8, 1fr);
+    }
+
+    /* Linear diagram: fluid wide matrix cells */
+    .linear-matrix-wide .lcell {
+      width: auto;
+      height: 18px;
+    }
+
+    .linear-matrix-wide {
+      width: 100%;
+      flex: 1;
+    }
+
+    .linear-matrix-tall .lcell {
+      width: 22px;
+      height: 26px;
+    }
+
+    .linear-diagram {
+      width: 100%;
+    }
+
+    /* Flow blocks */
+    .flow-block {
+      padding: 12px 10px;
+      min-width: 80px;
+    }
+
+    .flow-block-desc {
+      font-size: 11px;
+    }
+
+    .flow-block-label {
+      font-size: 10px;
+    }
+
+    /* Smaller fonts */
+    .stat-value {
+      font-size: 13px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+    }
+
+    .tag {
+      font-size: 10px;
+      padding: 4px 7px;
+    }
+
+    .example-card {
+      padding: 12px 14px;
+    }
+
+    .example-title {
+      font-size: 14px;
+    }
+
+    .example-detail {
+      font-size: 12px;
+    }
+
+    .connector-text {
+      font-size: 10px;
+      padding: 6px 14px;
+    }
+
+    .footer {
+      font-size: 12px;
+    }
+  }
+
+  @media (max-width: 374px) {
+    .matrix-y-label {
+      display: none;
+    }
+
+    .matrix-tick-col {
+      display: none;
+    }
+
+    .matrix-with-y {
+      gap: 0;
+    }
   }
 </style>
 </head>
