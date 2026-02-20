@@ -2,7 +2,7 @@
 
 Self-contained technical diagrams and infographics. Hosted on GitHub Pages.
 
-**Live site:** https://[username].github.io/visual-notes/
+**Live site:** https://vdegenova.github.io/visual-notes/
 
 ## Adding a new visual
 
