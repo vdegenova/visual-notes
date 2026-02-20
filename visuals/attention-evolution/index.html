@@ -8,7 +8,8 @@
 <meta property="og:description" content="From quadratic self-attention to hybrid routing — visualizing the design space.">
 <meta property="og:url" content="https://vdegenova.github.io/visual-notes/visuals/attention-evolution/">
 <meta property="og:type" content="article">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://vdegenova.github.io/visual-notes/images/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="How Attention Is Evolving">
 <meta name="twitter:description" content="From quadratic self-attention to hybrid routing — visualizing the design space.">
 <style>
@@ -466,9 +467,17 @@
   }
 
   .example-title {
+    display: block;
     font-size: 15px;
     font-weight: 600;
     margin-bottom: 4px;
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  a.example-title:hover {
+    color: var(--accent-green);
   }
 
   .example-authors {
@@ -808,12 +817,12 @@
   <div class="examples-section">
     <div class="examples-label">Recent examples</div>
     <div class="example-card">
-      <div class="example-title">SLA2</div>
+      <a class="example-title" href="https://arxiv.org/abs/2602.12675" target="_blank" rel="noopener">SLA2</a>
       <div class="example-authors">Zhang et al., Feb 2026</div>
       <div class="example-detail">Learned router for video diffusion. <span class="example-stat">97% sparsity</span>, <span class="example-stat">18.6× attention speedup</span>, minimal quality degradation.</div>
     </div>
     <div class="example-card">
-      <div class="example-title">MiniCPM-SALA</div>
+      <a class="example-title" href="https://arxiv.org/abs/2602.11761" target="_blank" rel="noopener">MiniCPM-SALA</a>
       <div class="example-authors">MiniCPM Team, Feb 2026</div>
       <div class="example-detail">Deterministic per-layer routing for LLMs. <span class="example-stat">1:3 sparse-to-linear ratio</span>, <span class="example-stat">~75% training cost reduction</span>.</div>
     </div>
