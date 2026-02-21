@@ -1655,32 +1655,28 @@ body {
   <div class="takeaways">
     <div class="takeaway">
       <div class="takeaway-marker" style="background:var(--accent-green);"></div>
-      <div>Fine-tuned SLMs consistently match or beat zero-shot LLMs on well-defined tasks.</div>
-    </div>
-    <div class="takeaway">
-      <div class="takeaway-marker" style="background:var(--accent-cyan);"></div>
-      <div>The "right" model size depends on 9 measurable signals, not vibes.</div>
+      <div>A fine-tuned 3B model will beat a zero-shot 400B model on a well-scoped task. The benchmarks are clear on this.</div>
     </div>
     <div class="takeaway">
       <div class="takeaway-marker" style="background:var(--accent-orange);"></div>
-      <div>MoE architectures blur the big/small boundary &mdash; active parameters matter more than total.</div>
-    </div>
-    <div class="takeaway">
-      <div class="takeaway-marker" style="background:var(--accent-blue);"></div>
-      <div>The future isn't choosing one size &mdash; it's routing between both.</div>
+      <div>MoE makes &ldquo;how big is this model?&rdquo; a harder question. Always check active parameters, not just total.</div>
     </div>
     <div class="takeaway">
       <div class="takeaway-marker" style="background:var(--accent-red);"></div>
-      <div>Start with an LLM prototype, then distill to an SLM when the task stabilizes.</div>
+      <div>LLMs still win on open-ended reasoning, long context, and tasks you can&rsquo;t define upfront. Don&rsquo;t force-fit an SLM where the task is ambiguous.</div>
     </div>
     <div class="takeaway">
-      <div class="takeaway-marker" style="background:var(--accent-green);"></div>
-      <div>80% of production queries are simple enough for a 3B model.</div>
+      <div class="takeaway-marker" style="background:var(--accent-cyan);"></div>
+      <div>Routing is a practical middle ground: classify requests by complexity, send the easy ones to a small model, and save the expensive model for what actually needs it.</div>
+    </div>
+    <div class="takeaway">
+      <div class="takeaway-marker" style="background:var(--accent-blue);"></div>
+      <div>Prototype with an LLM API first. Once the task stabilizes and you have labeled data, distill down to an SLM you own.</div>
     </div>
   </div>
 </div>
 
-<p class="footer-tagline">SLMs vs LLMs &mdash; built with Visual Notes</p>
+<p class="footer-tagline">Last updated Feb 21, 2026. Models change fast &mdash; the decision framework doesn&rsquo;t.</p>
 
 <a href="../../" style="display:inline-block;margin-top:32px;font-family:'DM Sans',sans-serif;font-size:14px;color:#8b8fa3;text-decoration:none;">&larr; Visual Notes</a>
 
