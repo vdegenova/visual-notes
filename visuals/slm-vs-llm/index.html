@@ -1,0 +1,2057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLMs vs LLMs: Sizing Models in a Fast-Moving Landscape</title>
+<meta name="description" content="New models ship weekly and MoE (Mixture of Experts) makes parameter counts misleading. A visual guide to navigating model sizes and knowing when to go small, go big, or route between both.">
+<meta property="og:title" content="SLMs vs LLMs: Sizing Models in a Fast-Moving Landscape">
+<meta property="og:description" content="New models ship weekly and MoE makes parameter counts misleading. A visual guide to navigating model sizes and knowing when to go small, go big, or route between both.">
+<meta property="og:url" content="https://vdegenova.github.io/visual-notes/visuals/slm-vs-llm/">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://vdegenova.github.io/visual-notes/images/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SLMs vs LLMs: Sizing Models in a Fast-Moving Landscape">
+<meta name="twitter:description" content="New models ship weekly and MoE makes parameter counts misleading. A visual guide to navigating model sizes and knowing when to go small, go big, or route between both.">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0f1117;
+  --surface: #181a23;
+  --surface-2: #1e2030;
+  --border: #2a2d3e;
+  --text: #e2e4ed;
+  --text-dim: #8b8fa3;
+  --accent-blue: #5b8def;
+  --accent-green: #4ecb8d;
+  --accent-orange: #e8915a;
+  --accent-red: #ef6b6b;
+  --accent-cyan: #67d4e2;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  line-height: 1.6;
+  padding: 48px 24px;
+  max-width: 540px;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+.header { margin-bottom: 36px; }
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.header .subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  margin-bottom: 0;
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.card.revealed { opacity: 1; transform: translateY(0); }
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+
+.card-landscape::before { background: var(--accent-blue); }
+.card-big::before { background: var(--accent-red); }
+.card-small::before { background: var(--accent-green); }
+.card-moe::before { background: var(--accent-orange); }
+.card-decision::before { background: var(--accent-cyan); }
+.card-routing::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+.card-takeaways::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+
+.card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.card-landscape .card-label { color: var(--accent-blue); }
+.card-big .card-label { color: var(--accent-red); }
+.card-small .card-label { color: var(--accent-green); }
+.card-moe .card-label { color: var(--accent-orange); }
+.card-decision .card-label { color: var(--accent-cyan); }
+.card-routing .card-label { color: var(--accent-green); }
+.card-takeaways .card-label { color: var(--accent-cyan); }
+
+.card-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.card-subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+/* Connector */
+.connector-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0;
+  width: 100%;
+}
+.connector-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: var(--surface-2);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  text-align: center;
+  line-height: 1.4;
+}
+.connector-text .arrow-down { color: var(--accent-green); }
+
+/* Stats */
+.stats-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 600;
+}
+.card-landscape .stat-value { color: var(--accent-blue); }
+.card-big .stat-value { color: var(--accent-red); }
+.card-small .stat-value { color: var(--accent-green); }
+.card-moe .stat-value { color: var(--accent-orange); }
+.card-decision .stat-value { color: var(--accent-cyan); }
+.card-routing .stat-value { color: var(--accent-green); }
+.stat-label { font-size: 12px; color: var(--text-dim); }
+
+/* Tags */
+.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.tag.pro { color: var(--accent-green); border-color: rgba(78, 203, 141, 0.25); }
+.tag.con { color: var(--accent-red); border-color: rgba(239, 107, 107, 0.25); }
+
+/* Buttons */
+.btn {
+  background: none;
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 12px;
+}
+.btn:hover { background: rgba(78, 203, 141, 0.1); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-orange { border-color: var(--accent-orange); color: var(--accent-orange); }
+.btn-orange:hover { background: rgba(232, 145, 90, 0.1); }
+.btn-cyan { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.btn-cyan:hover { background: rgba(103, 212, 226, 0.1); }
+.btn-reset {
+  border-color: var(--text-dim);
+  color: var(--text-dim);
+  margin-left: 8px;
+}
+.btn-reset:hover { background: rgba(139, 143, 163, 0.1); }
+
+/* ========================================
+   CARD 1: PARAMETER SCALE
+   ======================================== */
+.scale-container {
+  margin: 20px 0 16px;
+}
+.scale-track {
+  position: relative;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  display: flex;
+}
+.scale-zone {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zone-slm {
+  width: 39.2%;
+  background: rgba(78, 203, 141, 0.12);
+  border-right: 1px dashed rgba(139, 143, 163, 0.3);
+}
+.zone-grey {
+  width: 10%;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(139, 143, 163, 0.06),
+    rgba(139, 143, 163, 0.06) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  border-right: 1px dashed rgba(139, 143, 163, 0.3);
+}
+.zone-llm {
+  flex: 1;
+  background: rgba(239, 107, 107, 0.08);
+}
+.zone-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.zone-slm .zone-label { color: var(--accent-green); }
+.zone-grey .zone-label { color: var(--text-dim); }
+.zone-llm .zone-label { color: var(--accent-red); }
+
+.scale-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+.scale-tick {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+/* Model legend below the track */
+.model-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.model-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+.model-group-header {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: 100%;
+  margin-bottom: -2px;
+}
+.model-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.model-chip.show { opacity: 1; transform: translateY(0); }
+.model-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.model-dot.dot-green { background: var(--accent-green); }
+.model-dot.dot-grey { background: var(--text-dim); }
+.model-dot.dot-red { background: var(--accent-red); }
+.model-dot.dot-blue { background: var(--accent-blue); }
+
+/* Model name links */
+.model-bar-name a,
+.model-chip a,
+.moe-card-name a {
+  color: inherit;
+  text-decoration: none;
+  transition: filter 0.2s, text-decoration 0.2s;
+}
+.model-bar-name a:hover,
+.model-chip a:hover,
+.moe-card-name a:hover {
+  text-decoration: underline;
+  filter: brightness(1.2);
+}
+
+/* Model bar chart — log-scale widths */
+.model-bars {
+  margin-top: 16px;
+}
+.model-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.model-bar-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  width: 95px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.model-bar-track {
+  flex: 1;
+  height: 16px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.model-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  width: 0%;
+  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.model-bar-fill.bar-slm {
+  background: rgba(78, 203, 141, 0.5);
+  border-right: 2px solid var(--accent-green);
+}
+.model-bar-fill.bar-grey {
+  background: rgba(139, 143, 163, 0.4);
+  border-right: 2px solid var(--text-dim);
+}
+.model-bar-fill.bar-llm {
+  background: rgba(239, 107, 107, 0.45);
+  border-right: 2px solid var(--accent-red);
+}
+/* MoE: dim total bar with bright active inner segment */
+.model-bar-fill.bar-moe {
+  background: rgba(232, 145, 90, 0.2);
+  border-right: 1px solid rgba(232, 145, 90, 0.4);
+  position: relative;
+  border-radius: 3px;
+}
+.model-bar-active {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: rgba(232, 145, 90, 0.55);
+  border-right: 2px solid var(--accent-orange);
+  border-radius: 3px 0 0 3px;
+  width: 0%;
+  transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.8s;
+}
+.model-bar-row .moe-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.model-bar-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0 4px 103px;
+  opacity: 0.5;
+}
+.model-bar-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.model-bar-header-name {
+  width: 95px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.model-bar-header-params {
+  flex: 1;
+}
+.model-bar-section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  margin-left: 103px;
+}
+.model-bar-section-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  margin-left: 103px;
+  line-height: 1.4;
+}
+
+/* MoE comparison section */
+.moe-compare {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.moe-compare-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-orange);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.moe-card-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.moe-card-row:last-child { margin-bottom: 0; }
+.moe-card {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(232, 145, 90, 0.15);
+  background: rgba(232, 145, 90, 0.04);
+}
+.moe-card-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.moe-card-stats {
+  display: flex;
+  gap: 12px;
+}
+.moe-card-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.moe-card-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-orange);
+}
+.moe-card-val.dim {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+.moe-card-lbl {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.moe-card-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+/* ========================================
+   CARD 2: CAPABILITY PANELS
+   ======================================== */
+.capability-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.capability-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.capability-panel.show { opacity: 1; transform: translateY(0); }
+.capability-panel:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.capability-icon {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+.capability-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-red);
+  margin-bottom: 4px;
+}
+.capability-why {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* ========================================
+   CARD 3: BENCHMARK BARS
+   ======================================== */
+.benchmark-group {
+  margin-bottom: 14px;
+}
+.benchmark-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.benchmark-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.benchmark-model {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  width: 110px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.benchmark-track {
+  flex: 1;
+  height: 18px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.benchmark-fill {
+  height: 100%;
+  border-radius: 4px;
+  width: 0%;
+  transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.benchmark-fill.slm { background: var(--accent-green); }
+.benchmark-fill.llm { background: var(--accent-red); opacity: 0.6; }
+.benchmark-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  width: 40px;
+  flex-shrink: 0;
+}
+.benchmark-score.slm { color: var(--accent-green); }
+.benchmark-score.llm { color: var(--accent-red); }
+
+/* Cost/Latency Grid */
+.cost-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+.cost-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.cost-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent-green);
+  margin-bottom: 2px;
+}
+.cost-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.cost-detail {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+/* ========================================
+   CARD 4: MOE EXPERT ROUTING
+   ======================================== */
+.moe-sim {
+  margin-top: 16px;
+}
+.moe-pipeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.moe-stage {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 24px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: all 0.3s;
+  width: 180px;
+}
+.moe-stage.active-cyan {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(103, 212, 226, 0.08);
+  box-shadow: 0 0 12px rgba(103, 212, 226, 0.15);
+}
+.moe-stage.active-orange {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+  background: rgba(232, 145, 90, 0.08);
+  box-shadow: 0 0 12px rgba(232, 145, 90, 0.15);
+}
+.moe-stage.active-blue {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: rgba(91, 141, 239, 0.08);
+  box-shadow: 0 0 12px rgba(91, 141, 239, 0.15);
+}
+.moe-stage.active-green {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  background: rgba(78, 203, 141, 0.08);
+  box-shadow: 0 0 12px rgba(78, 203, 141, 0.15);
+}
+.moe-stage-label {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+.moe-stage-arrow {
+  color: var(--text-dim);
+  font-size: 12px;
+  opacity: 0.3;
+  padding: 4px 0;
+  transition: opacity 0.3s, color 0.3s;
+}
+.moe-stage-arrow.active {
+  opacity: 1;
+  color: var(--accent-orange);
+}
+.expert-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  width: 100%;
+}
+.expert-block {
+  aspect-ratio: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  color: var(--text-dim);
+  transition: all 0.4s ease;
+}
+.expert-block.active {
+  background: rgba(232, 145, 90, 0.2);
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+  font-weight: 600;
+}
+.expert-block.inactive {
+  opacity: 0.15;
+  border-color: transparent;
+}
+.moe-counter {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 14px 0 12px;
+  min-height: 20px;
+}
+.moe-counter .active-count { color: var(--accent-orange); font-weight: 600; }
+.moe-counter .total-count { color: var(--text-dim); }
+.moe-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* ========================================
+   CARD 5: DECISION ACCORDION
+   ======================================== */
+.accordion { margin-top: 16px; }
+.accordion-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.accordion-row:hover { border-color: rgba(139, 143, 163, 0.4); }
+.accordion-row.open { border-color: rgba(139, 143, 163, 0.3); }
+.accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+}
+.accordion-signal {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.accordion-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.badge-small {
+  background: rgba(78, 203, 141, 0.12);
+  color: var(--accent-green);
+  border: 1px solid rgba(78, 203, 141, 0.25);
+}
+.badge-big {
+  background: rgba(239, 107, 107, 0.12);
+  color: var(--accent-red);
+  border: 1px solid rgba(239, 107, 107, 0.25);
+}
+.accordion-chevron {
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.accordion-row.open .accordion-chevron { transform: rotate(90deg); }
+.accordion-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.accordion-body-inner {
+  padding: 0 14px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.tally {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.tally-big { color: var(--accent-red); }
+.tally-small { color: var(--accent-green); }
+.tally-sep { color: var(--border); }
+
+/* ========================================
+   CARD 6: ROUTING FLOW SIMULATION
+   ======================================== */
+.flow-sim { margin-top: 16px; position: relative; }
+.flow-diagram {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  position: relative;
+  min-height: 160px;
+}
+.flow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.flow-col-request { width: 70px; }
+.flow-col-router { width: 60px; }
+.flow-col-paths { flex: 1; }
+.flow-col-response { width: 70px; }
+
+.flow-box {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  text-align: center;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.flow-box-router {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(103, 212, 226, 0.06);
+}
+.flow-box-response { min-width: 60px; }
+
+.flow-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  padding: 0 8px;
+}
+.flow-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  position: relative;
+}
+.flow-path-slm {
+  border-color: rgba(78, 203, 141, 0.2);
+  background: rgba(78, 203, 141, 0.04);
+}
+.flow-path-llm {
+  border-color: rgba(239, 107, 107, 0.2);
+  background: rgba(239, 107, 107, 0.04);
+}
+.flow-path-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+.flow-path-slm .flow-path-label { color: var(--accent-green); }
+.flow-path-llm .flow-path-label { color: var(--accent-red); }
+.flow-path-desc {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.flow-path-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: auto;
+}
+.flow-path-slm .flow-path-pct { color: var(--accent-green); }
+.flow-path-llm .flow-path-pct { color: var(--accent-red); }
+
+.flow-dots-container {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.flow-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  opacity: 0;
+}
+.flow-dot.slm { background: var(--accent-green); }
+.flow-dot.llm { background: var(--accent-red); }
+
+.flow-cost-counter {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.flow-cost-box {
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+.flow-cost-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.flow-cost-box:first-child .flow-cost-value { color: var(--accent-green); }
+.flow-cost-box:last-child .flow-cost-value { color: var(--accent-red); }
+.flow-cost-label {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* Complexity slider */
+.flow-slider-row {
+  margin-bottom: 14px;
+}
+.flow-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.flow-slider-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.flow-slider-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-red);
+}
+.flow-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(78,203,141,0.3), rgba(239,107,107,0.3));
+  outline: none;
+  cursor: pointer;
+}
+.flow-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 6px rgba(0,0,0,0.4);
+  cursor: pointer;
+}
+.flow-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 6px rgba(0,0,0,0.4);
+  cursor: pointer;
+}
+
+/* ========================================
+   CARD 7: KEY TAKEAWAYS
+   ======================================== */
+.takeaways { margin-top: 12px; }
+.takeaway {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.takeaway:last-child { border-bottom: none; }
+.takeaway-marker {
+  width: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  align-self: stretch;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+@media (max-width: 480px) {
+  body { padding: 32px 16px; }
+  .header h1 { font-size: 24px; }
+  .card { padding: 20px; }
+  .capability-grid { grid-template-columns: 1fr; }
+  .cost-grid { grid-template-columns: 1fr 1fr; }
+  .moe-stage { padding: 6px 16px; width: 150px; }
+  .moe-stage-label { display: none; }
+  .moe-stage-arrow { padding: 2px 0; }
+  .expert-grid { gap: 3px; }
+  .expert-block { font-size: 7px; }
+  .stat-value { font-size: 13px; }
+  .tag { font-size: 10px; padding: 4px 7px; }
+  .benchmark-model { width: 80px; font-size: 8px; }
+  .benchmark-score { font-size: 9px; width: 36px; }
+  .flow-diagram { flex-direction: column; min-height: auto; gap: 8px; }
+  .flow-col-request, .flow-col-router, .flow-col-response { width: 100%; }
+  .flow-col { flex-direction: row; justify-content: center; gap: 8px; }
+  .flow-paths { padding: 0; }
+  .accordion-signal { font-size: 12px; }
+  .connector-text { font-size: 10px; padding: 7px 14px; }
+  .model-bar-name, .model-bar-header-name { width: 75px; font-size: 9px; }
+  .model-bar-sep { margin-left: 83px; }
+  .model-bar-section-label { margin-left: 83px; }
+  .model-bar-section-note { margin-left: 83px; font-size: 10px; }
+}
+
+@media (max-width: 374px) {
+  .header h1 { font-size: 20px; }
+  .expert-grid { grid-template-columns: repeat(8, 1fr); gap: 2px; }
+  .expert-block { font-size: 6px; }
+  .cost-grid { grid-template-columns: 1fr; }
+  .benchmark-model { width: 60px; font-size: 7px; }
+  .cost-value { font-size: 15px; }
+  .model-bar-name, .model-bar-header-name { width: 60px; font-size: 8px; }
+  .model-bar-section-label, .model-bar-section-note, .model-bar-sep { margin-left: 68px; }
+  .model-bar-section-note { font-size: 9px; }
+  .moe-card-row { flex-direction: column; }
+}
+
+/* ========================================
+   REDUCED MOTION
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .capability-panel {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .model-chip {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .model-bar-fill, .model-bar-active {
+    transition: none !important;
+  }
+  .benchmark-fill {
+    transition: none !important;
+  }
+  .expert-block {
+    transition: none !important;
+  }
+  .moe-stage {
+    transition: none !important;
+  }
+  .moe-stage-arrow {
+    transition: none !important;
+  }
+  .accordion-body {
+    transition: none !important;
+  }
+  .flow-dot {
+    display: none !important;
+  }
+}
+
+.footer-tagline {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 32px;
+  opacity: 0.6;
+}
+</style>
+</head>
+<body>
+
+<a href="../../" style="display:inline-block;margin-bottom:24px;font-family:'DM Sans',sans-serif;font-size:14px;color:#8b8fa3;text-decoration:none;">&larr; Visual Notes</a>
+
+<div class="header">
+  <h1>SLMs vs LLMs: Sizing Models in a Fast-Moving Landscape</h1>
+  <p class="subtitle">New models ship weekly and MoE (Mixture of Experts) makes parameter counts misleading. A visual guide to navigating model sizes &mdash; and knowing when to go small, go big, or route between both.</p>
+  <p class="subtitle" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:11px;opacity:0.6;">Feb 21, 2026</p>
+</div>
+
+<!-- ==========================================
+     CARD 1: THE MODEL LANDSCAPE
+     ========================================== -->
+<div class="card card-landscape">
+  <div class="card-label">Size Taxonomy</div>
+  <div class="card-title">The Model Landscape</div>
+  <div class="card-subtitle">Where models actually sit on the parameter scale &mdash; and why MoE makes it complicated.</div>
+
+  <div class="scale-container">
+    <div class="scale-track">
+      <div class="scale-zone zone-slm"><span class="zone-label">SLM &middot; 1&ndash;15B</span></div>
+      <div class="scale-zone zone-grey"><span class="zone-label">?</span></div>
+      <div class="scale-zone zone-llm"><span class="zone-label">LLM &middot; 30B+</span></div>
+    </div>
+    <div class="scale-ticks">
+      <span class="scale-tick">1B</span>
+      <span class="scale-tick">10B</span>
+      <span class="scale-tick">100B</span>
+      <span class="scale-tick">1T</span>
+    </div>
+  </div>
+
+  <div class="model-bars" id="model-bars">
+    <div class="model-bar-header">
+      <div class="model-bar-header-name">Model</div>
+      <div class="model-bar-header-params">Parameters (log scale)</div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/meta-llama/Llama-3.2-1B" target="_blank" rel="noopener">Llama 3.2 1B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-slm" data-width="3"></div></div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/microsoft/Phi-4-mini-instruct" target="_blank" rel="noopener">Phi-4-mini 3.8B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-slm" data-width="19.3"></div></div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/mistralai/Mistral-7B-v0.1" target="_blank" rel="noopener">Mistral 7B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-slm" data-width="28.2"></div></div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/microsoft/phi-4" target="_blank" rel="noopener">Phi-4 14B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-slm" data-width="38.2"></div></div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/mistralai/Mistral-Small-24B-Instruct-2501" target="_blank" rel="noopener">Mistral 22B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-grey" data-width="44.7"></div></div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/google/gemma-3-27b-it" target="_blank" rel="noopener">Gemma 3 27B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-grey" data-width="47.7"></div></div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/meta-llama/Llama-3.1-70B" target="_blank" rel="noopener">Llama 3.1 70B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-llm" data-width="61.5"></div></div>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/meta-llama/Llama-3.1-405B" target="_blank" rel="noopener">Llama 3.1 405B</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-llm" data-width="86.9"></div></div>
+    </div>
+    <div class="model-bar-sep"></div>
+    <div class="model-bar-section-label" style="color:var(--accent-orange);">Mixture of Experts (MoE)</div>
+    <div class="model-bar-section-note">These models store hundreds of billions of parameters but only activate a small fraction per token. The <span style="color:var(--accent-orange);">bright segment</span> shows what's actually used during inference.</div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/Qwen/Qwen3.5-397B-A17B" target="_blank" rel="noopener">Qwen 3.5</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-moe" data-width="86.6"><div class="model-bar-active" data-active="47.3"></div></div></div>
+      <span class="moe-label"><span style="color:var(--accent-orange)">17B</span> / 397B</span>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E" target="_blank" rel="noopener">Llama 4 Maverick</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-moe" data-width="86.7"><div class="model-bar-active" data-active="47.4"></div></div></div>
+      <span class="moe-label"><span style="color:var(--accent-orange)">17B</span> / 400B</span>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/deepseek-ai/DeepSeek-V3.2" target="_blank" rel="noopener">DeepSeek V3.2</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-moe" data-width="94.5"><div class="model-bar-active" data-active="55.3"></div></div></div>
+      <span class="moe-label"><span style="color:var(--accent-orange)">37B</span> / 685B</span>
+    </div>
+    <div class="model-bar-row">
+      <div class="model-bar-name"><a href="https://huggingface.co/moonshotai/Kimi-K2-Instruct" target="_blank" rel="noopener">Kimi K2</a></div>
+      <div class="model-bar-track"><div class="model-bar-fill bar-moe" data-width="100"><div class="model-bar-active" data-active="50.2"></div></div></div>
+      <span class="moe-label"><span style="color:var(--accent-orange)">32B</span> / 1T</span>
+    </div>
+  </div>
+
+  <div class="model-legend" id="model-legend">
+    <div class="model-group">
+      <div class="model-group-header" style="color:var(--accent-blue)">Proprietary Frontier <span style="font-weight:400;font-size:8px;opacity:0.6;">(sizes undisclosed)</span></div>
+      <div class="model-chip"><span class="model-dot dot-blue"></span><a href="https://openai.com/index/introducing-gpt-5-2/" target="_blank" rel="noopener">GPT-5.2</a></div>
+      <div class="model-chip"><span class="model-dot dot-blue"></span><a href="https://www.anthropic.com/news/claude-opus-4-6" target="_blank" rel="noopener">Claude Opus 4.6</a></div>
+      <div class="model-chip"><span class="model-dot dot-blue"></span><a href="https://www.anthropic.com/news/claude-sonnet-4-6" target="_blank" rel="noopener">Claude Sonnet 4.6</a></div>
+      <div class="model-chip"><span class="model-dot dot-blue"></span><a href="https://deepmind.google/models/model-cards/gemini-3-1-pro/" target="_blank" rel="noopener">Gemini 3.1 Pro</a></div>
+      <div class="model-chip"><span class="model-dot dot-blue"></span><a href="https://openai.com/index/gpt-4o-mini-advancing-cost-efficient-intelligence/" target="_blank" rel="noopener">GPT-4o mini</a></div>
+      <div class="model-chip"><span class="model-dot dot-blue"></span><a href="https://deepmind.google/models/gemini/flash/" target="_blank" rel="noopener">Gemini 3 Flash</a></div>
+      <div class="model-chip"><span class="model-dot dot-blue"></span><a href="https://x.ai/news/grok-4" target="_blank" rel="noopener">Grok 4</a></div>
+    </div>
+  </div>
+
+  <div class="moe-compare" id="moe-compare">
+    <div class="moe-compare-title">MoE &mdash; Total &ne; Active</div>
+    <div class="moe-card-row">
+      <div class="moe-card">
+        <div class="moe-card-name"><a href="https://huggingface.co/Qwen/Qwen3.5-397B-A17B" target="_blank" rel="noopener">Qwen 3.5</a></div>
+        <div class="moe-card-stats">
+          <div class="moe-card-stat">
+            <span class="moe-card-val">17B</span>
+            <span class="moe-card-lbl">active</span>
+          </div>
+          <div class="moe-card-stat">
+            <span class="moe-card-val dim">397B</span>
+            <span class="moe-card-lbl">total</span>
+          </div>
+        </div>
+        <div class="moe-card-pct">4.3% util</div>
+      </div>
+      <div class="moe-card">
+        <div class="moe-card-name">Llama 4 Maverick</div>
+        <div class="moe-card-stats">
+          <div class="moe-card-stat">
+            <span class="moe-card-val">17B</span>
+            <span class="moe-card-lbl">active</span>
+          </div>
+          <div class="moe-card-stat">
+            <span class="moe-card-val dim">400B</span>
+            <span class="moe-card-lbl">total</span>
+          </div>
+        </div>
+        <div class="moe-card-pct">4.3% util</div>
+      </div>
+    </div>
+    <div class="moe-card-row">
+      <div class="moe-card">
+        <div class="moe-card-name">DeepSeek V3.2</div>
+        <div class="moe-card-stats">
+          <div class="moe-card-stat">
+            <span class="moe-card-val">37B</span>
+            <span class="moe-card-lbl">active</span>
+          </div>
+          <div class="moe-card-stat">
+            <span class="moe-card-val dim">685B</span>
+            <span class="moe-card-lbl">total</span>
+          </div>
+        </div>
+        <div class="moe-card-pct">5.4% util</div>
+      </div>
+      <div class="moe-card">
+        <div class="moe-card-name">Kimi K2</div>
+        <div class="moe-card-stats">
+          <div class="moe-card-stat">
+            <span class="moe-card-val">32B</span>
+            <span class="moe-card-lbl">active</span>
+          </div>
+          <div class="moe-card-stat">
+            <span class="moe-card-val dim">1T</span>
+            <span class="moe-card-lbl">total</span>
+          </div>
+        </div>
+        <div class="moe-card-pct">3.2% util</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">1B&ndash;15B</span><span class="stat-label">SLM range</span></div>
+    <div class="stat"><span class="stat-value">30B+</span><span class="stat-label">LLM range</span></div>
+    <div class="stat"><span class="stat-value">15B&ndash;30B</span><span class="stat-label">Grey zone</span></div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&darr;</span>
+    When does bigger actually matter?
+    <span class="arrow-down">&darr;</span>
+  </div>
+</div>
+
+<!-- ==========================================
+     CARD 2: WHEN BIGGER IS BETTER
+     ========================================== -->
+<div class="card card-big">
+  <div class="card-label">Go Big</div>
+  <div class="card-title">When Bigger Is Better</div>
+  <div class="card-subtitle">Five capability domains where large models still dominate.</div>
+
+  <div class="capability-grid" id="capability-grid">
+    <div class="capability-panel">
+      <div class="capability-name">Complex Reasoning</div>
+      <div class="capability-why">Multi-step logic and chain-of-thought require massive parameter counts to store compositional knowledge.</div>
+    </div>
+    <div class="capability-panel">
+      <div class="capability-name">Zero-shot Generalization</div>
+      <div class="capability-why">No fine-tuning data? Large models handle novel tasks through broad pre-training coverage.</div>
+    </div>
+    <div class="capability-panel">
+      <div class="capability-name">Long Context (128K+)</div>
+      <div class="capability-why">Processing entire codebases or legal documents needs the capacity of large architectures.</div>
+    </div>
+    <div class="capability-panel">
+      <div class="capability-name">Agentic Workflows</div>
+      <div class="capability-why">Complex tool use, multi-turn planning, and self-correction demand the reasoning depth only LLMs provide.</div>
+    </div>
+    <div class="capability-panel">
+      <div class="capability-name">Open-ended Generation</div>
+      <div class="capability-why">Creative writing, brainstorming, and unconstrained generation benefit from diverse training at scale.</div>
+    </div>
+  </div>
+
+  <div class="tags">
+    <span class="tag con">&times; $$$</span>
+    <span class="tag con">&times; Slower</span>
+    <span class="tag pro">&check; No fine-tuning needed</span>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&darr;</span>
+    But what if you have training data and care about cost?
+    <span class="arrow-down">&darr;</span>
+  </div>
+</div>
+
+<!-- ==========================================
+     CARD 3: THE SMALL MODEL ADVANTAGE
+     ========================================== -->
+<div class="card card-small">
+  <div class="card-label">Go Small</div>
+  <div class="card-title">The Small Model Advantage</div>
+  <div class="card-subtitle">Fine-tuned SLMs routinely match or beat zero-shot LLMs on well-defined tasks.</div>
+
+  <div id="benchmark-section">
+    <div class="benchmark-group">
+      <div class="benchmark-label">Sentiment Analysis <span style="font-size:9px;color:var(--text-dim);font-weight:400;">(SST-2, F1)</span></div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">BERT 110M FT</div>
+        <div class="benchmark-track"><div class="benchmark-fill slm" data-width="94.4"></div></div>
+        <div class="benchmark-score slm">94.4%</div>
+      </div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">GPT-4o zero-shot</div>
+        <div class="benchmark-track"><div class="benchmark-fill llm" data-width="87.0"></div></div>
+        <div class="benchmark-score llm">87.0%</div>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px;line-height:1.4;opacity:0.7;font-style:italic;">A 110M-param model from 2018 &mdash; with SFT data, even old architectures win.</div>
+    </div>
+
+    <div class="benchmark-group">
+      <div class="benchmark-label">Headline Classification <span style="font-size:9px;color:var(--text-dim);font-weight:400;">(Financial, wt. F1)</span></div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">Phi-3-mini 3.8B FT</div>
+        <div class="benchmark-track"><div class="benchmark-fill slm" data-width="95.6"></div></div>
+        <div class="benchmark-score slm">95.6%</div>
+      </div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">GPT-4 zero-shot</div>
+        <div class="benchmark-track"><div class="benchmark-fill llm" data-width="83.4"></div></div>
+        <div class="benchmark-score llm">83.4%</div>
+      </div>
+    </div>
+
+    <div class="benchmark-group">
+      <div class="benchmark-label">Financial Sentiment <span style="font-size:9px;color:var(--text-dim);font-weight:400;">(FiQA-SA, wt. F1)</span></div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">Llama 3 8B FT</div>
+        <div class="benchmark-track"><div class="benchmark-fill slm" data-width="86.6"></div></div>
+        <div class="benchmark-score slm">86.6%</div>
+      </div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">GPT-4 zero-shot</div>
+        <div class="benchmark-track"><div class="benchmark-fill llm" data-width="75.7"></div></div>
+        <div class="benchmark-score llm">75.7%</div>
+      </div>
+    </div>
+
+    <div class="benchmark-group">
+      <div class="benchmark-label">Named Entity Recognition <span style="font-size:9px;color:var(--text-dim);font-weight:400;">(CoNLL)</span></div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">Mistral 7B LoRA</div>
+        <div class="benchmark-track"><div class="benchmark-fill slm" data-width="98.9"></div></div>
+        <div class="benchmark-score slm">98.9%</div>
+      </div>
+      <div class="benchmark-bar-row">
+        <div class="benchmark-model">GPT-4 zero-shot</div>
+        <div class="benchmark-track"><div class="benchmark-fill llm" data-width="74.2"></div></div>
+        <div class="benchmark-score llm">74.2%</div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);line-height:1.7;opacity:0.7;">
+      Sources: <a href="https://arxiv.org/abs/2602.06370" target="_blank" rel="noopener" style="color:var(--accent-green);text-decoration:none;">arXiv:2602.06370</a> (SST-2) &middot; <a href="https://arxiv.org/abs/2411.02476" target="_blank" rel="noopener" style="color:var(--accent-green);text-decoration:none;">arXiv:2411.02476</a> (Headline, FiQA-SA) &middot; <a href="https://arxiv.org/abs/2405.00732" target="_blank" rel="noopener" style="color:var(--accent-green);text-decoration:none;">arXiv:2405.00732</a> (CoNLL)
+    </div>
+  </div>
+
+  <div class="tags" style="margin-top:18px;">
+    <span class="tag pro">&check; Significantly cheaper at scale</span>
+    <span class="tag pro">&check; Own your weights &amp; data</span>
+    <span class="tag pro">&check; Runs on-device / air-gapped</span>
+    <span class="tag con">&times; Requires SFT data &amp; training pipeline</span>
+    <span class="tag con">&times; More ops complexity vs. 3P API</span>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&darr;</span>
+    What about MoE &mdash; is that big or small?
+    <span class="arrow-down">&darr;</span>
+  </div>
+</div>
+
+<!-- ==========================================
+     CARD 4: THE MOE COMPLICATION
+     ========================================== -->
+<div class="card card-moe">
+  <div class="card-label">Mixture of Experts</div>
+  <div class="card-title">The MoE Complication</div>
+  <div class="card-subtitle">MoE models have up to 1T total parameters but only activate 17&ndash;37B per token. So are they big or small?</div>
+
+  <div style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:18px;">
+    In a dense model, every parameter fires on every token. MoE splits the network into dozens of specialist sub-networks (&ldquo;experts&rdquo;) and uses a lightweight <span style="color:var(--accent-orange);">router</span> to pick a small handful for each token. The result: frontier-level quality at a fraction of the compute, because most of the model stays asleep.
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);margin-bottom:14px;opacity:0.7;">Try it &mdash; route a token through the pipeline and watch which experts activate.</div>
+
+  <div class="moe-sim">
+    <div class="moe-pipeline">
+      <div class="moe-stage" id="stage-token-in">Token In<div class="moe-stage-label">input embedding</div></div>
+      <div class="moe-stage-arrow" id="arrow-1">&darr;</div>
+      <div class="moe-stage" id="stage-attention">Attention<div class="moe-stage-label">shared layers</div></div>
+      <div class="moe-stage-arrow" id="arrow-2">&darr;</div>
+      <div class="moe-stage" id="stage-router">Router<div class="moe-stage-label">selects experts</div></div>
+      <div class="moe-stage-arrow" id="arrow-3">&darr;</div>
+      <div class="expert-grid" id="expert-grid"></div>
+      <div class="moe-stage-arrow" id="arrow-4">&darr;</div>
+      <div class="moe-stage" id="stage-output">Output<div class="moe-stage-label">shared projection</div></div>
+      <div class="moe-stage-arrow" id="arrow-5">&darr;</div>
+      <div class="moe-stage" id="stage-token-out">Token Out<div class="moe-stage-label">next token</div></div>
+    </div>
+    <div class="moe-counter" id="moe-counter"></div>
+    <div class="moe-buttons">
+      <button class="btn btn-orange" id="route-btn" onclick="routeToken()">Route a Token</button>
+      <button class="btn btn-reset" id="reset-btn" onclick="resetMoE()" style="display:none;">Reset</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">1T</span><span class="stat-label">Total (Kimi K2)</span></div>
+    <div class="stat"><span class="stat-value">32B</span><span class="stat-label">Active per token</span></div>
+    <div class="stat"><span class="stat-value">3.2%</span><span class="stat-label">Utilization</span></div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&darr;</span>
+    So how do you actually decide?
+    <span class="arrow-down">&darr;</span>
+  </div>
+</div>
+
+<!-- ==========================================
+     CARD 5: DECISION FRAMEWORK
+     ========================================== -->
+<div class="card card-decision">
+  <div class="card-label">Decision Framework</div>
+  <div class="card-title">Match the Signal to the Size</div>
+  <div class="card-subtitle">Nine questions that tell you whether to go big or small. Click each to see why.</div>
+
+  <div class="accordion" id="accordion">
+    <div class="accordion-row" data-answer="small" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Is the task well-defined?</div>
+        <span class="accordion-badge badge-small">Go Small</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">Narrow, well-scoped tasks (classification, extraction, routing) are SLM territory. Fine-tuning on your specific labels consistently beats zero-shot LLMs.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="small" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Do you have labeled training data?</div>
+        <span class="accordion-badge badge-small">Go Small</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">Even 500&ndash;1K labeled examples can push a 1&ndash;3B model past a 400B generalist. No data means you need the LLM's zero-shot ability.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="small" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Is query volume high?</div>
+        <span class="accordion-badge badge-small">Go Small</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">At 10K+ queries/day, the cost gap becomes existential. A fine-tuned SLM at $0.01/1K tokens vs $1.00/1K tokens compounds fast.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="small" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Do you need real-time latency?</div>
+        <span class="accordion-badge badge-small">Go Small</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">SLMs generate 150&ndash;300 tok/s vs 50&ndash;100 tok/s for LLMs. For user-facing applications, that latency gap defines the entire UX.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="small" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Is the deployment target edge or mobile?</div>
+        <span class="accordion-badge badge-small">Go Small</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">Models under 4B parameters can run on-device with quantization. No network round-trip, no cloud dependency, works fully offline.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="small" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Is budget constrained?</div>
+        <span class="accordion-badge badge-small">Go Small</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">Fine-tuning a 3B model costs ~$50&ndash;200. Running it costs 100x less than an LLM API. The ROI is immediate for well-defined tasks.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="small" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Does data need to stay on-premise?</div>
+        <span class="accordion-badge badge-small">Go Small</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">Self-hosted SLMs mean no data leaves your infrastructure. For healthcare, finance, and legal this is often a hard requirement, not a preference.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="big" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Does the system handle diverse, unpredictable tasks?</div>
+        <span class="accordion-badge badge-big">Go Big</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">If you can't enumerate the task space &mdash; customer service bots, coding assistants, research tools &mdash; you need the LLM's broad generalization ability.</div></div>
+    </div>
+    <div class="accordion-row" data-answer="big" onclick="toggleAccordion(this)">
+      <div class="accordion-header">
+        <div class="accordion-signal">Does the task require multi-step reasoning?</div>
+        <span class="accordion-badge badge-big">Go Big</span>
+        <span class="accordion-chevron">&rsaquo;</span>
+      </div>
+      <div class="accordion-body"><div class="accordion-body-inner">Chain-of-thought, planning, and complex inference still favor large models. SLMs struggle with problems requiring 3+ reasoning steps or compositional logic.</div></div>
+    </div>
+  </div>
+
+  <div class="tally" id="tally">
+    <span>Your signals:</span>
+    <span class="tally-big" id="tally-big">0 Big</span>
+    <span class="tally-sep">|</span>
+    <span class="tally-small" id="tally-small">0 Small</span>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&darr;</span>
+    In practice, you don't pick one &mdash; you route between both.
+    <span class="arrow-down">&darr;</span>
+  </div>
+</div>
+
+<!-- ==========================================
+     CARD 6: ROUTING PLAYBOOK
+     ========================================== -->
+<div class="card card-routing">
+  <div class="card-label">Routing Playbook</div>
+  <div class="card-title">Route, Don't Choose</div>
+  <div class="card-subtitle">A small router model classifies each request, sending simple queries to the SLM and hard ones to the LLM.</div>
+
+  <div class="flow-sim">
+    <div class="flow-slider-row">
+      <div class="flow-slider-header">
+        <span class="flow-slider-label">Complex query ratio</span>
+        <span class="flow-slider-value" id="complexity-value">20%</span>
+      </div>
+      <input type="range" class="flow-slider" id="complexity-slider" min="5" max="80" value="20" oninput="updateComplexity(this.value)">
+    </div>
+    <div class="flow-paths" id="flow-paths">
+      <div class="flow-path flow-path-slm" id="path-slm">
+        <div>
+          <div class="flow-path-label">SLM Path</div>
+          <div class="flow-path-desc" id="slm-desc">Fast, cheap &mdash; handles ~80% of traffic</div>
+        </div>
+        <div class="flow-path-pct" id="slm-pct">0</div>
+      </div>
+      <div class="flow-path flow-path-llm" id="path-llm">
+        <div>
+          <div class="flow-path-label">LLM Path</div>
+          <div class="flow-path-desc" id="llm-desc">Powerful &mdash; handles ~20% of complex queries</div>
+        </div>
+        <div class="flow-path-pct" id="llm-pct">0</div>
+      </div>
+    </div>
+
+    <div class="flow-cost-counter" id="flow-cost-counter">
+      <div class="flow-cost-box">
+        <div class="flow-cost-value" id="routed-cost">$0.00</div>
+        <div class="flow-cost-label">With routing</div>
+      </div>
+      <div class="flow-cost-box">
+        <div class="flow-cost-value" id="naive-cost">$0.00</div>
+        <div class="flow-cost-label">All-LLM baseline</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:14px;">
+      <button class="btn btn-cyan" id="sim-btn" onclick="simulateRequests()">Simulate Requests</button>
+      <button class="btn btn-reset" id="sim-reset-btn" onclick="resetRouting()" style="display:none;">Reset</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value">100x</span><span class="stat-label">SLM cost advantage</span></div>
+    <div class="stat"><span class="stat-value">$0.01</span><span class="stat-label">SLM / 1K tokens</span></div>
+    <div class="stat"><span class="stat-value">$1.00</span><span class="stat-label">LLM / 1K tokens</span></div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text">
+    <span class="arrow-down">&darr;</span>
+    The bottom line
+    <span class="arrow-down">&darr;</span>
+  </div>
+</div>
+
+<!-- ==========================================
+     CARD 7: KEY TAKEAWAYS
+     ========================================== -->
+<div class="card card-takeaways">
+  <div class="card-label">Key Takeaways</div>
+  <div class="card-title">What to Remember</div>
+
+  <div class="takeaways">
+    <div class="takeaway">
+      <div class="takeaway-marker" style="background:var(--accent-green);"></div>
+      <div>Fine-tuned SLMs consistently match or beat zero-shot LLMs on well-defined tasks.</div>
+    </div>
+    <div class="takeaway">
+      <div class="takeaway-marker" style="background:var(--accent-cyan);"></div>
+      <div>The "right" model size depends on 9 measurable signals, not vibes.</div>
+    </div>
+    <div class="takeaway">
+      <div class="takeaway-marker" style="background:var(--accent-orange);"></div>
+      <div>MoE architectures blur the big/small boundary &mdash; active parameters matter more than total.</div>
+    </div>
+    <div class="takeaway">
+      <div class="takeaway-marker" style="background:var(--accent-blue);"></div>
+      <div>The future isn't choosing one size &mdash; it's routing between both.</div>
+    </div>
+    <div class="takeaway">
+      <div class="takeaway-marker" style="background:var(--accent-red);"></div>
+      <div>Start with an LLM prototype, then distill to an SLM when the task stabilizes.</div>
+    </div>
+    <div class="takeaway">
+      <div class="takeaway-marker" style="background:var(--accent-green);"></div>
+      <div>80% of production queries are simple enough for a 3B model.</div>
+    </div>
+  </div>
+</div>
+
+<p class="footer-tagline">SLMs vs LLMs &mdash; built with Visual Notes</p>
+
+<a href="../../" style="display:inline-block;margin-top:32px;font-family:'DM Sans',sans-serif;font-size:14px;color:#8b8fa3;text-decoration:none;">&larr; Visual Notes</a>
+
+<script>
+/* ==========================================
+   UTILITIES
+   ========================================== */
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ==========================================
+   SCROLL REVEAL — Cards
+   ========================================== */
+var cardObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('revealed');
+      cardObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.card').forEach(function(card) {
+  if (reducedMotion) { card.classList.add('revealed'); }
+  else { cardObserver.observe(card); }
+});
+
+/* ==========================================
+   CARD 1: PARAMETER SCALE — Bar chart + chips
+   ========================================== */
+var modelBarObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      var bars = entry.target.querySelectorAll('.model-bar-fill');
+      bars.forEach(function(bar, i) {
+        setTimeout(function() {
+          bar.style.width = bar.dataset.width + '%';
+        }, i * 100);
+      });
+      // Animate MoE active segments after total bars fill
+      var actives = entry.target.querySelectorAll('.model-bar-active');
+      actives.forEach(function(seg) {
+        seg.style.width = seg.dataset.active + '%';
+      });
+      modelBarObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+var modelBarsEl = document.getElementById('model-bars');
+if (reducedMotion) {
+  modelBarsEl.querySelectorAll('.model-bar-fill').forEach(function(bar) {
+    bar.style.width = bar.dataset.width + '%';
+  });
+  modelBarsEl.querySelectorAll('.model-bar-active').forEach(function(seg) {
+    seg.style.width = seg.dataset.active + '%';
+  });
+} else {
+  modelBarObserver.observe(modelBarsEl);
+}
+
+// Proprietary chips staggered reveal
+var chipObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      var chips = entry.target.querySelectorAll('.model-chip');
+      chips.forEach(function(c, i) {
+        setTimeout(function() { c.classList.add('show'); }, i * 60);
+      });
+      chipObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+var legendEl = document.getElementById('model-legend');
+if (reducedMotion) {
+  legendEl.querySelectorAll('.model-chip').forEach(function(c) { c.classList.add('show'); });
+} else {
+  chipObserver.observe(legendEl);
+}
+
+
+/* ==========================================
+   CARD 2: CAPABILITY PANELS — Staggered reveal
+   ========================================== */
+var capObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      var panels = entry.target.querySelectorAll('.capability-panel');
+      panels.forEach(function(p, i) {
+        setTimeout(function() { p.classList.add('show'); }, i * 120);
+      });
+      capObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.2 });
+
+var capGrid = document.getElementById('capability-grid');
+if (reducedMotion) {
+  capGrid.querySelectorAll('.capability-panel').forEach(function(p) { p.classList.add('show'); });
+} else {
+  capObserver.observe(capGrid);
+}
+
+/* ==========================================
+   CARD 3: BENCHMARK BARS — Scroll-triggered fill
+   ========================================== */
+var barObserver = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      var bars = entry.target.querySelectorAll('.benchmark-fill');
+      bars.forEach(function(bar, i) {
+        setTimeout(function() {
+          bar.style.width = bar.dataset.width + '%';
+        }, i * 100);
+      });
+      barObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+var benchSection = document.getElementById('benchmark-section');
+if (reducedMotion) {
+  benchSection.querySelectorAll('.benchmark-fill').forEach(function(bar) {
+    bar.style.width = bar.dataset.width + '%';
+  });
+} else {
+  barObserver.observe(benchSection);
+}
+
+/* ==========================================
+   CARD 4: MOE EXPERT ROUTING SIMULATION
+   ========================================== */
+var expertGrid = document.getElementById('expert-grid');
+for (var i = 0; i < 32; i++) {
+  var block = document.createElement('div');
+  block.className = 'expert-block';
+  block.textContent = 'E' + i;
+  block.dataset.index = i;
+  expertGrid.appendChild(block);
+}
+
+var moeRouteCount = 0;
+var lastActiveExperts = [];
+var moeAnimating = false;
+
+function clearPipelineStages() {
+  var stageIds = ['stage-token-in', 'stage-attention', 'stage-router', 'stage-output', 'stage-token-out'];
+  var activeClasses = ['active-cyan', 'active-orange', 'active-blue', 'active-green'];
+  stageIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    activeClasses.forEach(function(cls) { el.classList.remove(cls); });
+  });
+  for (var i = 1; i <= 5; i++) {
+    document.getElementById('arrow-' + i).classList.remove('active');
+  }
+}
+
+function routeToken() {
+  if (moeAnimating) return;
+  moeAnimating = true;
+
+  var blocks = expertGrid.querySelectorAll('.expert-block');
+  var counter = document.getElementById('moe-counter');
+  var resetBtn = document.getElementById('reset-btn');
+  var routeBtn = document.getElementById('route-btn');
+  routeBtn.disabled = true;
+  resetBtn.style.display = 'inline-block';
+
+  // Clear previous stage highlights
+  clearPipelineStages();
+  blocks.forEach(function(block) { block.className = 'expert-block'; });
+
+  // Pick 8 random experts
+  var available = [];
+  for (var i = 0; i < 32; i++) available.push(i);
+  for (var i = available.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = available[i];
+    available[i] = available[j];
+    available[j] = temp;
+  }
+  var activeExperts = available.slice(0, 8);
+
+  // Step 1: Token In
+  setTimeout(function() {
+    document.getElementById('stage-token-in').classList.add('active-cyan');
+    document.getElementById('arrow-1').classList.add('active');
+  }, 0);
+
+  // Step 2: Attention
+  setTimeout(function() {
+    document.getElementById('stage-attention').classList.add('active-blue');
+    document.getElementById('arrow-2').classList.add('active');
+  }, 150);
+
+  // Step 3: Router
+  setTimeout(function() {
+    document.getElementById('stage-router').classList.add('active-orange');
+    document.getElementById('arrow-3').classList.add('active');
+  }, 300);
+
+  // Step 4: Experts light up
+  setTimeout(function() {
+    blocks.forEach(function(block) {
+      var idx = parseInt(block.dataset.index);
+      if (activeExperts.indexOf(idx) !== -1) {
+        block.className = 'expert-block active';
+      } else {
+        block.className = 'expert-block inactive';
+      }
+    });
+    document.getElementById('arrow-4').classList.add('active');
+  }, 500);
+
+  // Step 5: Output
+  setTimeout(function() {
+    document.getElementById('stage-output').classList.add('active-blue');
+    document.getElementById('arrow-5').classList.add('active');
+  }, 650);
+
+  // Step 6: Token Out + update counter
+  setTimeout(function() {
+    document.getElementById('stage-token-out').classList.add('active-green');
+
+    lastActiveExperts = activeExperts;
+    moeRouteCount++;
+    counter.innerHTML = '<span class="active-count">32B active</span> / <span class="total-count">1T total</span> &mdash; token #' + moeRouteCount;
+    routeBtn.textContent = 'Route Another Token';
+    routeBtn.disabled = false;
+    moeAnimating = false;
+  }, 800);
+}
+
+function resetMoE() {
+  var blocks = expertGrid.querySelectorAll('.expert-block');
+  var counter = document.getElementById('moe-counter');
+
+  clearPipelineStages();
+  blocks.forEach(function(block) {
+    block.className = 'expert-block';
+  });
+  counter.innerHTML = '';
+  moeRouteCount = 0;
+  lastActiveExperts = [];
+  moeAnimating = false;
+  document.getElementById('route-btn').textContent = 'Route a Token';
+  document.getElementById('route-btn').disabled = false;
+  document.getElementById('reset-btn').style.display = 'none';
+}
+
+/* ==========================================
+   CARD 5: DECISION ACCORDION
+   ========================================== */
+var openRows = new Set();
+
+function toggleAccordion(row) {
+  var body = row.querySelector('.accordion-body');
+  var inner = row.querySelector('.accordion-body-inner');
+
+  if (row.classList.contains('open')) {
+    row.classList.remove('open');
+    body.style.maxHeight = '0';
+    openRows.delete(row);
+  } else {
+    row.classList.add('open');
+    body.style.maxHeight = inner.scrollHeight + 16 + 'px';
+    openRows.add(row);
+  }
+  updateTally();
+}
+
+function updateTally() {
+  var bigCount = 0, smallCount = 0;
+  openRows.forEach(function(row) {
+    var answer = row.dataset.answer;
+    if (answer === 'big') bigCount++;
+    else smallCount++;
+  });
+  document.getElementById('tally-big').textContent = bigCount + ' Big';
+  document.getElementById('tally-small').textContent = smallCount + ' Small';
+}
+
+/* ==========================================
+   CARD 6: ROUTING FLOW SIMULATION
+   ========================================== */
+var simRunning = false;
+var simSlmCount = 0;
+var simLlmCount = 0;
+var simRoutedCost = 0;
+var simNaiveCost = 0;
+var SLM_COST = 0.01;
+var LLM_COST = 1.00;
+var complexRatio = 0.2;
+
+function updateComplexity(val) {
+  complexRatio = parseInt(val) / 100;
+  var pct = parseInt(val);
+  var slmPct = 100 - pct;
+  document.getElementById('complexity-value').textContent = pct + '%';
+  document.getElementById('slm-desc').textContent = 'Fast, cheap \u2014 handles ~' + slmPct + '% of traffic';
+  document.getElementById('llm-desc').textContent = 'Powerful \u2014 handles ~' + pct + '% of complex queries';
+}
+
+async function simulateRequests() {
+  if (simRunning) return;
+  simRunning = true;
+  document.getElementById('sim-btn').disabled = true;
+  document.getElementById('sim-reset-btn').style.display = 'inline-block';
+
+  var totalRequests = 20;
+  var slmPath = document.getElementById('path-slm');
+  var llmPath = document.getElementById('path-llm');
+
+  for (var i = 0; i < totalRequests; i++) {
+    var isSimple = Math.random() >= complexRatio;
+
+    if (isSimple) {
+      simSlmCount++;
+      simRoutedCost += SLM_COST;
+      slmPath.style.borderColor = 'rgba(78,203,141,0.6)';
+      slmPath.style.background = 'rgba(78,203,141,0.1)';
+    } else {
+      simLlmCount++;
+      simRoutedCost += LLM_COST;
+      llmPath.style.borderColor = 'rgba(239,107,107,0.6)';
+      llmPath.style.background = 'rgba(239,107,107,0.1)';
+    }
+
+    simNaiveCost += LLM_COST;
+
+    document.getElementById('slm-pct').textContent = simSlmCount;
+    document.getElementById('llm-pct').textContent = simLlmCount;
+    document.getElementById('routed-cost').textContent = '$' + simRoutedCost.toFixed(2);
+    document.getElementById('naive-cost').textContent = '$' + simNaiveCost.toFixed(2);
+
+    await sleep(200);
+
+    slmPath.style.borderColor = '';
+    slmPath.style.background = '';
+    llmPath.style.borderColor = '';
+    llmPath.style.background = '';
+
+    await sleep(50);
+  }
+
+  simRunning = false;
+  document.getElementById('sim-btn').disabled = false;
+  document.getElementById('sim-btn').textContent = 'Simulate More';
+}
+
+function resetRouting() {
+  simSlmCount = 0;
+  simLlmCount = 0;
+  simRoutedCost = 0;
+  simNaiveCost = 0;
+  document.getElementById('slm-pct').textContent = '0';
+  document.getElementById('llm-pct').textContent = '0';
+  document.getElementById('routed-cost').textContent = '$0.00';
+  document.getElementById('naive-cost').textContent = '$0.00';
+  document.getElementById('sim-btn').textContent = 'Simulate Requests';
+  document.getElementById('sim-reset-btn').style.display = 'none';
+
+  var slmPath = document.getElementById('path-slm');
+  var llmPath = document.getElementById('path-llm');
+  slmPath.style.borderColor = '';
+  slmPath.style.background = '';
+  llmPath.style.borderColor = '';
+  llmPath.style.background = '';
+}
+</script>
+
+</body>
+</html>
