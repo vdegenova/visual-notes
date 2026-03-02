@@ -973,6 +973,38 @@ a { color: inherit; }
 @media (max-width: 480px) {
   body { padding: 32px 16px; }
 }
+
+/* ── MOBILE FIXES ── */
+@media (max-width: 600px) {
+  /* Trajectory rows: wrap blocks instead of scrolling */
+  .trajectory-row {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .traj-arrow { display: none; }
+
+  /* Eval pipeline: 2×2 grid, hide connector arrows */
+  .eval-pipeline {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .eval-arrow { display: none; }
+  .eval-step { min-width: 0; }
+
+  /* Category legend: allow smaller items */
+  .cat-item { min-width: 120px; }
+
+  /* Chart filters: wrap */
+  .chart-filters { flex-wrap: wrap; }
+
+  /* Tooltip: wider, larger text */
+  #tooltip {
+    max-width: calc(100vw - 32px);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
 </style>
 </head>
 <body>
@@ -1577,21 +1609,32 @@ function toggleCard(card) {
 // ══════════════════════════════════════
 const tooltip = document.getElementById('tooltip');
 
-document.querySelectorAll('.glossary').forEach(el => {
-  el.addEventListener('mouseenter', (e) => {
-    const term = el.dataset.term;
-    const def  = el.dataset.def;
-    tooltip.innerHTML = `<strong>${term}</strong>${def}`;
-    tooltip.classList.add('visible');
-    positionTooltip(e);
-  });
-  el.addEventListener('mousemove', positionTooltip);
-  el.addEventListener('mouseleave', () => {
-    tooltip.classList.remove('visible');
-  });
-});
+function showGlossaryTooltip(el) {
+  tooltip.innerHTML = `<strong>${el.dataset.term}</strong>${el.dataset.def}`;
+  tooltip.classList.add('visible');
+}
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
 
-function positionTooltip(e) {
+// Position relative to an element (touch) — always stays on screen
+function positionNearEl(el) {
+  const rect = el.getBoundingClientRect();
+  const tw = Math.min(280, window.innerWidth - 32);
+  const th = tooltip.offsetHeight || 90;
+  const margin = 10;
+  let top  = rect.bottom + margin;
+  let left = rect.left;
+  if (left + tw > window.innerWidth  - 8) left = window.innerWidth - tw - 8;
+  if (left < 8) left = 8;
+  if (top + th > window.innerHeight - 8) top = rect.top - th - margin;
+  if (top < 8) top = 8;
+  tooltip.style.left = left + 'px';
+  tooltip.style.top  = top  + 'px';
+}
+
+// Position following mouse cursor
+function positionAtCursor(e) {
   const margin = 12;
   const tw = tooltip.offsetWidth  || 280;
   const th = tooltip.offsetHeight || 80;
@@ -1602,6 +1645,30 @@ function positionTooltip(e) {
   tooltip.style.left = x + 'px';
   tooltip.style.top  = y + 'px';
 }
+
+document.querySelectorAll('.glossary').forEach(el => {
+  // Mouse (desktop)
+  el.addEventListener('mouseenter', (e) => {
+    showGlossaryTooltip(el);
+    positionAtCursor(e);
+  });
+  el.addEventListener('mousemove', positionAtCursor);
+  el.addEventListener('mouseleave', hideTooltip);
+
+  // Touch (mobile) — tap to show, tap anywhere else to dismiss
+  el.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const wasVisible = tooltip.classList.contains('visible');
+    hideTooltip();
+    if (!wasVisible || tooltip._lastEl !== el) {
+      showGlossaryTooltip(el);
+      // Let the DOM update before measuring height
+      requestAnimationFrame(() => positionNearEl(el));
+      tooltip._lastEl = el;
+      document.addEventListener('touchstart', hideTooltip, { once: true, capture: true });
+    }
+  }, { passive: false });
+});
 
 // ══════════════════════════════════════
 // CAUSALITY GRAPH DEMO
