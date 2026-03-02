@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMA-Bench: Why Your Agent's Memory Is Broken | Visual Notes</title>
+<meta name="description" content="The first benchmark targeting long-horizon agentic memory. Spoiler: every existing memory system underperforms simply extending the context window.">
+<meta property="og:title" content="AMA-Bench: Why Your Agent's Memory Is Broken">
+<meta property="og:description" content="The first benchmark targeting long-horizon agentic memory. Spoiler: every existing memory system underperforms simply extending the context window.">
+<meta property="og:url" content="https://vdegenova.github.io/visual-notes/visuals/ama-bench/">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://vdegenova.github.io/visual-notes/images/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AMA-Bench: Why Your Agent's Memory Is Broken">
+<meta name="twitter:description" content="The first benchmark targeting long-horizon agentic memory. Spoiler: every existing memory system underperforms simply extending the context window.">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0f1117;
+  --surface: #181a23;
+  --surface-2: #1e2030;
+  --border: #2a2d3e;
+  --text: #e2e4ed;
+  --text-dim: #8b8fa3;
+  --accent-blue: #5b8def;
+  --accent-green: #4ecb8d;
+  --accent-orange: #e8915a;
+  --accent-red: #ef6b6b;
+  --accent-cyan: #67d4e2;
+  --accent-purple: #a78bfa;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  line-height: 1.6;
+  padding: 48px 24px;
+  max-width: 680px;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+/* ── BACK LINK ── */
+.back-link {
+  display: inline-block;
+  margin-bottom: 32px;
+  font-size: 14px;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.back-link:hover { color: var(--accent-green); }
+
+/* ── HEADER / HERO ── */
+.header {
+  margin-bottom: 40px;
+}
+.header-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-blue);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.header h1 {
+  font-size: clamp(26px, 5vw, 36px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  margin-bottom: 14px;
+}
+.header-sub {
+  font-size: 16px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  max-width: 600px;
+  margin-bottom: 18px;
+}
+.tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.tag.accent {
+  border-color: rgba(91, 141, 239, 0.4);
+  color: var(--accent-blue);
+  background: rgba(91, 141, 239, 0.08);
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.card.revealed { opacity: 1; transform: translateY(0); }
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.card-gap::before     { background: var(--accent-blue); }
+.card-bench::before   { background: var(--accent-cyan); }
+.card-results::before { background: var(--accent-green); }
+.card-fails::before   { background: var(--accent-orange); }
+.card-agent::before   { background: var(--accent-purple); }
+.card-sowhat::before  { background: var(--accent-red); }
+
+.card-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.card-gap     .card-num { color: var(--accent-blue); }
+.card-bench   .card-num { color: var(--accent-cyan); }
+.card-results .card-num { color: var(--accent-green); }
+.card-fails   .card-num { color: var(--accent-orange); }
+.card-agent   .card-num { color: var(--accent-purple); }
+.card-sowhat  .card-num { color: var(--accent-red); }
+
+.card-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  line-height: 1.25;
+}
+.card-body {
+  font-size: 15px;
+  color: var(--text-dim);
+  line-height: 1.65;
+  max-width: 600px;
+}
+.card-body + .card-body { margin-top: 10px; }
+.card-body strong { color: var(--text); font-weight: 600; }
+
+/* ── CONNECTOR ── */
+.connector-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 0;
+}
+.connector-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: var(--surface-2);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  text-align: center;
+  line-height: 1.4;
+}
+.connector-text .arrow-down { color: var(--accent-green); font-size: 14px; }
+
+/* ── GLOSSARY TOOLTIPS ── */
+.glossary {
+  border-bottom: 1px dotted var(--text-dim);
+  cursor: help;
+  text-decoration: none;
+  color: inherit;
+}
+.glossary:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+#tooltip {
+  position: fixed;
+  background: var(--surface-2);
+  border: 1px solid var(--accent-cyan);
+  border-radius: 8px;
+  padding: 10px 14px;
+  max-width: 280px;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1000;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+#tooltip strong { color: var(--accent-cyan); display: block; margin-bottom: 4px; }
+#tooltip.visible { opacity: 1; }
+
+/* ── COMPARISON GRID ── */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 20px;
+}
+@media (max-width: 520px) { .comparison-grid { grid-template-columns: 1fr; } }
+.comparison-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  transition: border-color 0.2s;
+}
+.comparison-card.old { border-top: 2px solid var(--accent-red); }
+.comparison-card.new { border-top: 2px solid var(--accent-green); }
+.comp-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.comparison-card.old .comp-label { color: var(--accent-red); }
+.comparison-card.new .comp-label { color: var(--accent-green); }
+.comparison-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.comparison-card p { font-size: 13px; color: var(--text-dim); line-height: 1.55; }
+
+/* ── TRAJECTORY STREAM ── */
+.stream-visual {
+  margin-top: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  overflow-x: auto;
+}
+.stream-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.stream-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.replay-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.replay-btn:hover { border-color: var(--accent-green); color: var(--accent-green); }
+.trajectory-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+.traj-block {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  animation: blockAppear 0.3s ease-out forwards;
+}
+.traj-block.action { background: rgba(91, 141, 239, 0.15); color: var(--accent-blue); border: 1px solid rgba(91, 141, 239, 0.25); }
+.traj-block.obs    { background: rgba(78, 203, 141, 0.12); color: var(--accent-green); border: 1px solid rgba(78, 203, 141, 0.2); }
+.traj-block.tool   { background: rgba(232, 145, 90, 0.12); color: var(--accent-orange); border: 1px solid rgba(232, 145, 90, 0.2); }
+.traj-block.state  { background: rgba(167, 139, 250, 0.12); color: var(--accent-purple); border: 1px solid rgba(167, 139, 250, 0.2); }
+.traj-arrow {
+  color: var(--text-dim);
+  font-size: 11px;
+  opacity: 0;
+  animation: blockAppear 0.3s ease-out forwards;
+}
+@keyframes blockAppear {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.legend-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.legend-dot { width: 7px; height: 7px; border-radius: 2px; }
+
+/* ── EVAL PIPELINE ── */
+.eval-pipeline {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 20px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.eval-step {
+  flex: 1;
+  min-width: 110px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 12px;
+  text-align: center;
+}
+.eval-step-icon {
+  font-size: 18px;
+  margin-bottom: 7px;
+}
+.eval-step-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+.eval-step-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.eval-arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  color: var(--text-dim);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* ── QA EXAMPLE ── */
+.qa-demo {
+  margin-top: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.qa-demo-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+  padding: 12px 16px 0;
+}
+.qa-traj {
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.qa-traj-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.qa-traj-step .qs-cmd  { color: var(--accent-blue); }
+.qa-traj-step .qs-obs  { color: var(--text-dim); }
+.qa-traj-step .qs-key  { color: var(--accent-orange); }
+.qa-traj-step .qs-arrow { color: var(--text-dim); flex-shrink: 0; }
+.qa-traj-step .qs-note {
+  font-size: 10px;
+  color: var(--accent-orange);
+  background: rgba(232,145,90,0.1);
+  border: 1px solid rgba(232,145,90,0.2);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.qa-question-row {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.qa-question-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+.qa-question-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.qa-answers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+@media (max-width: 480px) { .qa-answers { grid-template-columns: 1fr; } }
+.qa-answer {
+  padding: 12px 16px;
+}
+.qa-answer + .qa-answer {
+  border-left: 1px solid var(--border);
+}
+@media (max-width: 480px) {
+  .qa-answer + .qa-answer { border-left: none; border-top: 1px solid var(--border); }
+}
+.qa-answer-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.qa-answer.correct .qa-answer-label { color: var(--accent-green); }
+.qa-answer.wrong   .qa-answer-label { color: var(--accent-red); }
+.qa-answer-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+}
+.qa-answer.correct .qa-answer-value { color: var(--accent-green); }
+.qa-answer.wrong   .qa-answer-value { color: var(--accent-red); }
+.qa-answer-reason {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* ── BENCH GRID ── */
+.bench-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 18px;
+}
+@media (max-width: 520px) { .bench-grid { grid-template-columns: 1fr; } }
+.bench-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.bench-card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bench-card .desc { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.5; }
+.domain-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+.domain-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(91, 141, 239, 0.1);
+  color: var(--accent-blue);
+  border: 1px solid rgba(91, 141, 239, 0.15);
+}
+.domain-pill.synth {
+  background: rgba(78, 203, 141, 0.1);
+  color: var(--accent-green);
+  border-color: rgba(78, 203, 141, 0.15);
+}
+
+/* ── STAT ROW ── */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+@media (max-width: 480px) { .stat-row { grid-template-columns: 1fr; } }
+.stat-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.stat-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.stat-number.blue   { color: var(--accent-blue); }
+.stat-number.green  { color: var(--accent-green); }
+.stat-number.orange { color: var(--accent-orange); }
+.stat-desc { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+
+/* ── CATEGORY LEGEND ── */
+.category-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.cat-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  flex: 1;
+  min-width: 160px;
+}
+.cat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* ── BAR CHART ── */
+.chart-container {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 20px;
+}
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.chart-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.chart-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+.chart-filter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.chart-filter:hover { border-color: rgba(139,143,163,0.5); color: var(--text); }
+.chart-filter.active { background: rgba(91,141,239,0.12); border-color: var(--accent-blue); color: var(--accent-blue); }
+.bar-chart { display: flex; flex-direction: column; gap: 7px; }
+.bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 46px;
+  align-items: center;
+  gap: 10px;
+  transition: opacity 0.3s ease;
+}
+@media (max-width: 460px) { .bar-row { grid-template-columns: 90px 1fr 38px; } }
+.bar-row.dimmed { opacity: 0.15; }
+.bar-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bar-track { height: 24px; background: rgba(255,255,255,0.03); border-radius: 4px; overflow: hidden; }
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  width: 0;
+  transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.bar-value { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--text); }
+
+/* ── FAILURE CARDS ── */
+.failure-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+.failure-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  user-select: none;
+}
+.failure-card:hover { border-color: var(--accent-orange); background: rgba(232, 145, 90, 0.04); }
+.failure-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.failure-icon {
+  font-size: 20px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(232, 145, 90, 0.1);
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+.failure-main h3 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+.failure-main p { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.click-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 5px;
+  opacity: 0.7;
+}
+.failure-detail {
+  display: none;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.65;
+}
+.failure-detail strong { color: var(--text); }
+.failure-detail code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: rgba(91,141,239,0.1);
+  color: var(--accent-blue);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.failure-card.expanded .failure-detail { display: block; }
+.failure-card.expanded .click-hint { display: none; }
+
+/* ── COMPRESSION VISUAL ── */
+.compression-visual {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 520px) { .compression-visual { grid-template-columns: 1fr; } }
+.comp-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.comp-panel-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.comp-panel.before .comp-panel-label { color: var(--accent-green); }
+.comp-panel.after  .comp-panel-label { color: var(--accent-red); }
+.comp-steps { display: flex; flex-direction: column; gap: 6px; }
+.comp-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+}
+.comp-step.alive  { background: rgba(78,203,141,0.08); border-color: rgba(78,203,141,0.18); color: var(--accent-green); }
+.comp-step.dead   { background: rgba(139,143,163,0.05); border-color: rgba(139,143,163,0.1); color: rgba(139,143,163,0.4); }
+.comp-step.merged { background: rgba(232,145,90,0.08); border-color: rgba(232,145,90,0.18); color: var(--accent-orange); }
+.comp-arrow {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding-left: 4px;
+}
+.comp-edge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--accent-green);
+  opacity: 0.7;
+  padding-left: 8px;
+}
+.comp-edge.lost { color: rgba(139,143,163,0.3); }
+
+/* ── ARCH VISUAL ── */
+.arch-visual {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 20px;
+}
+.arch-flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.arch-node {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 20px;
+  width: 100%;
+  max-width: 460px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.arch-node:hover { border-color: rgba(139,143,163,0.4); }
+.arch-node h4 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 3px;
+}
+.arch-node p  { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+.arch-node.input     { border-color: rgba(91,141,239,0.4); }
+.arch-node.input h4  { color: var(--accent-blue); }
+.arch-node.graph     { border-color: rgba(78,203,141,0.4); }
+.arch-node.graph h4  { color: var(--accent-green); }
+.arch-node.output    { border-color: rgba(167,139,250,0.4); }
+.arch-node.output h4 { color: var(--accent-purple); }
+.arch-connector {
+  width: 2px;
+  height: 20px;
+  background: var(--border);
+  position: relative;
+}
+.arch-connector::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--border);
+}
+.arch-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+  max-width: 460px;
+}
+@media (max-width: 460px) { .arch-split { grid-template-columns: 1fr; } }
+.arch-split .arch-node { max-width: none; }
+.arch-merge-connector {
+  width: 100%;
+  max-width: 460px;
+  height: 22px;
+  position: relative;
+}
+.arch-merge-connector::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 11px;
+  border-left: 2px solid var(--border);
+  border-right: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  border-radius: 0 0 6px 6px;
+}
+.arch-merge-connector::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 11px;
+  background: var(--border);
+}
+
+/* ── CAUSALITY GRAPH ── */
+.graph-demo {
+  margin-top: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.graph-demo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.graph-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.btn {
+  background: none;
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn:hover { background: rgba(78,203,141,0.1); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-purple { border-color: var(--accent-purple); color: var(--accent-purple); }
+.btn-purple:hover { background: rgba(167,139,250,0.1); }
+#causal-svg {
+  width: 100%;
+  height: 240px;
+  overflow: visible;
+}
+.graph-node-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  fill: var(--text-dim);
+  text-anchor: middle;
+}
+
+/* ── CALLOUT ── */
+.callout {
+  margin-top: 18px;
+  background: linear-gradient(135deg, rgba(91,141,239,0.05), rgba(78,203,141,0.05));
+  border: 1px solid rgba(91,141,239,0.2);
+  border-radius: 10px;
+  padding: 18px;
+}
+.callout-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+  margin-bottom: 8px;
+}
+.callout p { font-size: 14px; color: var(--text); line-height: 1.6; }
+.callout p strong { color: var(--accent-green); }
+
+/* ── TAKEAWAY CARDS ── */
+.takeaway-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+.takeaway-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  user-select: none;
+}
+.takeaway-card:hover { border-color: rgba(239,107,107,0.5); }
+.takeaway-header { display: flex; gap: 12px; align-items: flex-start; }
+.takeaway-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.takeaway-card:nth-child(1) .takeaway-num { background: rgba(91,141,239,0.12); color: var(--accent-blue); }
+.takeaway-card:nth-child(2) .takeaway-num { background: rgba(78,203,141,0.12); color: var(--accent-green); }
+.takeaway-card:nth-child(3) .takeaway-num { background: rgba(232,145,90,0.12); color: var(--accent-orange); }
+.takeaway-main h3 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+.takeaway-main p { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.takeaway-detail {
+  display: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.65;
+}
+.takeaway-detail strong { color: var(--text); }
+.takeaway-card.expanded .takeaway-detail { display: block; }
+.takeaway-card.expanded .click-hint { display: none; }
+
+/* ── FOOTER ── */
+.footer {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.footer-author { display: flex; align-items: center; gap: 10px; }
+.footer-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bg);
+}
+.footer-name  { font-size: 14px; font-weight: 600; }
+.footer-role  { font-size: 12px; color: var(--text-dim); }
+.footer-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-blue);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+.footer-link:hover { border-color: var(--accent-blue); }
+
+/* ── CARD STACK ── */
+.card-stack { display: flex; flex-direction: column; gap: 14px; }
+
+@media (max-width: 480px) {
+  body { padding: 32px 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- BACK LINK -->
+<a class="back-link" href="../../">&larr; Visual Notes</a>
+
+<!-- HERO -->
+<div class="header">
+  <div class="header-label">Zhao et al. &middot; arXiv 2602.22769 &middot; Mar 1, 2026</div>
+  <h1>AMA-Bench: Why Your Agent's Memory Is Broken</h1>
+  <p class="header-sub">The first benchmark that actually tests memory the way agents use it — not chat history, but dense machine-generated trajectories full of tool calls, API responses, and causal chains. Spoiler: everything underperforms.</p>
+  <div class="tags">
+    <span class="tag accent">Agent Memory</span>
+    <span class="tag">Long-Horizon</span>
+    <span class="tag">Benchmark</span>
+    <span class="tag">RAG</span>
+    <span class="tag">Causality Graphs</span>
+  </div>
+</div>
+
+<!-- CARD STACK -->
+<div class="card-stack">
+
+<!-- ═══════════════════════════════════════
+     CARD 1 · THE GAP
+     ═══════════════════════════════════════ -->
+<div class="card card-gap">
+  <div class="card-num">01 &mdash; The Gap</div>
+  <div class="card-title">We've been evaluating the wrong kind of memory</div>
+  <p class="card-body">Existing memory benchmarks test <strong>dialogue-centric</strong> recall — can a chatbot remember what a human said 300 turns ago? But real-world agents don't operate in dialogue. They generate a continuous stream of <strong>machine-generated interactions</strong> with environments: tool calls, structured API responses, code execution outputs, state observations.</p>
+  <p class="card-body">These two regimes are fundamentally different. The paper argues we've been optimizing for the wrong evaluation target.</p>
+
+  <div class="comparison-grid">
+    <div class="comparison-card old">
+      <div class="comp-label">Existing Benchmarks</div>
+      <h3>Dialogue Memory</h3>
+      <p>Human-to-agent conversation. Natural language. Subjective preferences. Sparse information density. Tests like LoCoMo, LongMemEval.</p>
+    </div>
+    <div class="comparison-card new">
+      <div class="comp-label">AMA-Bench</div>
+      <h3>Agentic Memory</h3>
+      <p>Agent-to-environment interaction. Machine-generated tokens. Dense objective facts. Causal dependencies between steps. Real tool outputs.</p>
+    </div>
+  </div>
+
+  <div class="stream-visual">
+    <div class="stream-header">
+      <div class="stream-label">What an agent trajectory looks like</div>
+      <button class="replay-btn" id="replayBtn" onclick="replayStream()">Replay &rarr;</button>
+    </div>
+    <div class="trajectory-row" id="traj-stream-1"></div>
+    <div class="trajectory-row" id="traj-stream-2"></div>
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent-blue)"></div>Action</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent-green)"></div>Observation</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent-orange)"></div>Tool Call</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent-purple)"></div>State Change</div>
+    </div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> dense, causal, machine-generated</div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CARD 2 · THE BENCHMARK
+     ═══════════════════════════════════════ -->
+<div class="card card-bench">
+  <div class="card-num">02 &mdash; The Benchmark</div>
+  <div class="card-title">Can your memory system answer questions about what actually happened?</div>
+  <p class="card-body">Every entry in AMA-Bench is a recorded agent trajectory paired with factual questions about it. A memory system is given the trajectory (or a compressed version), asked a question, and scored on whether its answer is correct. Simple idea — brutal in practice.</p>
+
+  <!-- Evaluation pipeline -->
+  <div class="eval-pipeline">
+    <div class="eval-step">
+      <div class="eval-step-icon">&#128221;</div>
+      <div class="eval-step-title">Trajectory</div>
+      <div class="eval-step-desc">Agent runs a task. Every action, tool call, and observation is logged.</div>
+    </div>
+    <div class="eval-arrow">&#8594;</div>
+    <div class="eval-step">
+      <div class="eval-step-icon">&#129504;</div>
+      <div class="eval-step-title">Memory System</div>
+      <div class="eval-step-desc">Ingests &amp; compresses the trajectory via RAG, summarization, or a graph.</div>
+    </div>
+    <div class="eval-arrow">&#8594;</div>
+    <div class="eval-step">
+      <div class="eval-step-icon">&#10067;</div>
+      <div class="eval-step-title">Question</div>
+      <div class="eval-step-desc">Factual question about what happened, requiring retrieval or recall.</div>
+    </div>
+    <div class="eval-arrow">&#8594;</div>
+    <div class="eval-step">
+      <div class="eval-step-icon">&#9989;</div>
+      <div class="eval-step-title">Score</div>
+      <div class="eval-step-desc">Answer judged ✓/✗ against ground truth. Averaged across all QA pairs.</div>
+    </div>
+  </div>
+
+  <!-- Concrete QA example -->
+  <div class="qa-demo">
+    <div class="qa-demo-label">A real benchmark question</div>
+    <div class="qa-traj">
+      <div class="qa-traj-step">
+        <span class="qs-cmd">filter(price &lt; $80)</span>
+        <span class="qs-arrow">&#8594;</span>
+        <span class="qs-obs">12 results</span>
+      </div>
+      <div class="qa-traj-step">
+        <span class="qs-key">apply_coupon("SAVE10")</span>
+        <span class="qs-arrow">&#8594;</span>
+        <span class="qs-key">-$8.00 applied</span>
+        <span class="qs-note">&#9650; key step</span>
+      </div>
+      <div class="qa-traj-step">
+        <span class="qs-cmd">checkout.init()</span>
+        <span class="qs-arrow">&#8594;</span>
+        <span class="qs-obs">subtotal: $71.99</span>
+      </div>
+      <div class="qa-traj-step">
+        <span class="qs-cmd">payment.process()</span>
+        <span class="qs-arrow">&#8594;</span>
+        <span class="qs-obs">order confirmed</span>
+      </div>
+    </div>
+    <div class="qa-question-row">
+      <div class="qa-question-label">Question</div>
+      <div class="qa-question-text">"What was the subtotal after the coupon was applied?"</div>
+    </div>
+    <div class="qa-answers">
+      <div class="qa-answer correct">
+        <div class="qa-answer-label">&#10003; Correct answer</div>
+        <div class="qa-answer-value">$71.99</div>
+        <div class="qa-answer-reason">Full context preserved the coupon step.</div>
+      </div>
+      <div class="qa-answer wrong">
+        <div class="qa-answer-label">&#10007; RAG / summarization</div>
+        <div class="qa-answer-value">$79.99</div>
+        <div class="qa-answer-reason">Coupon step compressed away. Model sees the pre-discount figure.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two subsets -->
+  <p class="card-body" style="margin-top:20px">The benchmark covers two complementary data sources — one for realism, one for scale:</p>
+  <div class="bench-grid">
+    <div class="bench-card">
+      <h3>&#127757; Real-World</h3>
+      <p class="desc">Actual agent recordings from six task categories. Questions written by human experts against authentic trajectories.</p>
+      <div class="domain-pills">
+        <span class="domain-pill">Web</span>
+        <span class="domain-pill">QA</span>
+        <span class="domain-pill">Text2SQL</span>
+        <span class="domain-pill">SWE</span>
+        <span class="domain-pill">Gaming</span>
+        <span class="domain-pill">Embodied AI</span>
+      </div>
+    </div>
+    <div class="bench-card">
+      <h3>&#129514; Synthetic</h3>
+      <p class="desc">Programmatically generated at arbitrary lengths. Rule-verified QA enables controlled scaling experiments.</p>
+      <div class="domain-pills">
+        <span class="domain-pill synth">Any length</span>
+        <span class="domain-pill synth">Auto-verified</span>
+        <span class="domain-pill synth">Stress-test</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> two subsets, one verdict</div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CARD 3 · THE RESULTS
+     ═══════════════════════════════════════ -->
+<div class="card card-results">
+  <div class="card-num">03 &mdash; The Results</div>
+  <div class="card-title">Even frontier models struggle. Memory systems make it worse.</div>
+  <p class="card-body">The headline finding: <strong>most existing memory systems underperform the <span class="glossary" data-term="long-context baseline" data-def="The simplest possible approach: just feed the entire trajectory into the model's context window at once. No compression, no retrieval. Expensive, but surprisingly hard to beat.">long-context baseline</span></strong>. Errors from lossy compression and <span class="glossary" data-term="cosine similarity" data-def="A measure of how similar two vectors are by the angle between them. Embedding-based retrieval uses this to find 'related' text chunks. Works well for documents; breaks down when relevance is causal, not semantic.">similarity-based retrieval</span> compound over long trajectories. More memory machinery &ne; better recall.</p>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-number blue" data-target="72.3">0%</div>
+      <div class="stat-desc">GPT 5.2 accuracy<br>best overall</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number green" data-target="57.2">0%</div>
+      <div class="stat-desc">AMA-Agent accuracy<br>best memory system</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number orange" data-target="11.2">0%</div>
+      <div class="stat-desc">improvement over<br>strongest baseline</div>
+    </div>
+  </div>
+
+  <div class="category-legend">
+    <div class="cat-item">
+      <div class="cat-dot" style="background:var(--accent-blue)"></div>
+      <span><strong style="color:var(--text)">Long-context:</strong> Entire trajectory fed directly into model. Simple but expensive.</span>
+    </div>
+    <div class="cat-item">
+      <div class="cat-dot" style="background:var(--accent-orange)"></div>
+      <span><strong style="color:var(--text)">Memory systems:</strong> <span class="glossary" data-term="RAG" data-def="Retrieval-Augmented Generation. Instead of feeding an entire document to an AI, you first search for relevant chunks and only give those to the model. Works great for documents; breaks down for agent trajectories.">RAG</span>, <span class="glossary" data-term="BM25" data-def="A keyword-matching search algorithm — like a smarter version of grep. Finds exact word matches rather than semantic similarity. Fast and effective for keyword queries.">BM25</span>, summarization, graph memory. Add infrastructure to manage long context.</span>
+    </div>
+    <div class="cat-item">
+      <div class="cat-dot" style="background:var(--accent-green)"></div>
+      <span><strong style="color:var(--text)">Proposed (AMA-Agent):</strong> Causality graph + hybrid retrieval. The paper's contribution.</span>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <div class="chart-header">
+      <div class="chart-title">Avg. Accuracy on AMA-Bench</div>
+      <div class="chart-filters">
+        <button class="chart-filter active" data-filter="all"     onclick="filterChart('all')">All</button>
+        <button class="chart-filter"        data-filter="context" onclick="filterChart('context')">Long-Context</button>
+        <button class="chart-filter"        data-filter="memory"  onclick="filterChart('memory')">Memory</button>
+        <button class="chart-filter"        data-filter="proposed" onclick="filterChart('proposed')">Proposed</button>
+      </div>
+    </div>
+    <div class="bar-chart" id="barChart"></div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> why does memory fail?</div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CARD 4 · WHY MEMORY FAILS
+     ═══════════════════════════════════════ -->
+<div class="card card-fails">
+  <div class="card-num">04 &mdash; Why Memory Fails</div>
+  <div class="card-title">Two compounding failure modes</div>
+  <p class="card-body">The paper identifies two root causes that explain why bolting existing memory systems onto agentic workflows actually hurts performance. Click each to expand.</p>
+
+  <div class="failure-list">
+    <div class="failure-card" onclick="toggleCard(this)">
+      <div class="failure-header">
+        <div class="failure-icon">&#128676;</div>
+        <div class="failure-main">
+          <h3>Lossy Memory Compression</h3>
+          <p>Summarization and chunking discard the causal structure agents depend on.</p>
+          <div class="click-hint">click to expand &rarr;</div>
+        </div>
+      </div>
+      <div class="failure-detail">
+        When you summarize an agent trajectory, you lose the <strong>causal dependencies</strong> between steps. If the agent ran <code>search(X)</code>, got result Y, then used Y to call <code>filter(Y, Z)</code>, a summary might keep the final result but drop the chain of reasoning that produced it. The agent can no longer explain <em>why</em> it reached a conclusion, and <span class="glossary" data-term="multi-hop reasoning" data-def="Answering a question that requires connecting multiple separate facts. E.g., 'Why did the agent choose product X?' requires tracing back through search → filter → compare — each step depending on the last.">multi-hop</span> questions over the trajectory become unanswerable. Unlike dialogue — where a summary captures the gist — agentic trajectories contain <strong>dense, causally-linked facts where every link matters</strong>.
+      </div>
+    </div>
+    <div class="failure-card" onclick="toggleCard(this)">
+      <div class="failure-header">
+        <div class="failure-icon">&#127919;</div>
+        <div class="failure-main">
+          <h3>Similarity-Based Retrieval Mismatch</h3>
+          <p><span class="glossary" data-term="embedding" data-def="Turning text into a list of numbers (a vector) that represents its meaning. Similar meanings produce similar vectors. Used to find 'related' text — but 'related' means semantically similar, not causally connected.">Embedding</span>-based retrieval finds semantically related but causally irrelevant chunks.</p>
+          <div class="click-hint">click to expand &rarr;</div>
+        </div>
+      </div>
+      <div class="failure-detail">
+        <span class="glossary" data-term="RAG" data-def="Retrieval-Augmented Generation. Instead of feeding an entire document to an AI, you first search for relevant chunks and only give those to the model. Works great for documents; breaks down for agent trajectories.">RAG</span> finds chunks that are <strong>semantically similar</strong> to a query. But in agentic workflows, the relevant context is often <strong>causally related, not semantically similar</strong>. An error in step 14 might be caused by a state change in step 3 — but the <span class="glossary" data-term="embedding" data-def="Turning text into a list of numbers (a vector) that represents its meaning. Similar meanings produce similar vectors. Used to find 'related' text — but 'related' means semantically similar, not causally connected.">embeddings</span> of those two steps look nothing alike. Meanwhile, step 22 might share keywords but belong to a completely different causal chain. Traditional RAG retrieves step 22 and misses step 3. Every wrong retrieval pollutes the context window with noise.
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 22px; margin-bottom: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent-orange);">Before vs. After Summarization</div>
+  <p class="card-body" style="margin-bottom: 0; font-size: 13px;">Summarization compresses tokens but severs causal chains. Left: the full trajectory with live causal edges. Right: the summarized version — steps merged, links gone.</p>
+
+  <div class="compression-visual">
+    <div class="comp-panel before">
+      <div class="comp-panel-label">Before Summarization</div>
+      <div class="comp-steps">
+        <div class="comp-step alive">search("red shoes")</div>
+        <div class="comp-edge">&#8594; causes</div>
+        <div class="comp-step alive">obs: 47 results</div>
+        <div class="comp-edge">&#8594; causes</div>
+        <div class="comp-step alive">filter(price &lt; 80)</div>
+        <div class="comp-edge">&#8594; causes</div>
+        <div class="comp-step alive">obs: 12 results</div>
+        <div class="comp-edge">&#8594; causes</div>
+        <div class="comp-step alive">compare(id:3, id:7)</div>
+        <div class="comp-edge">&#8594; causes</div>
+        <div class="comp-step alive">cart.add(id:3)</div>
+      </div>
+    </div>
+    <div class="comp-panel after">
+      <div class="comp-panel-label">After Summarization</div>
+      <div class="comp-steps">
+        <div class="comp-step dead">search("red shoes")</div>
+        <div class="comp-edge lost">&#8594; lost</div>
+        <div class="comp-step dead">obs: 47 results</div>
+        <div class="comp-edge lost">&#8594; lost</div>
+        <div class="comp-step dead">filter(price &lt; 80)</div>
+        <div class="comp-edge lost">&#8594; lost</div>
+        <div class="comp-step dead">obs: 12 results</div>
+        <div class="comp-edge lost">&#8594; lost</div>
+        <div class="comp-step merged">Summary: agent added product #3 to cart</div>
+        <div style="font-size:11px;color:rgba(139,143,163,0.4);padding-left:8px;font-family:'JetBrains Mono',monospace;">why? unknown.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> a better approach</div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CARD 5 · AMA-AGENT
+     ═══════════════════════════════════════ -->
+<div class="card card-agent">
+  <div class="card-num">05 &mdash; AMA-Agent</div>
+  <div class="card-title">Causality graphs + hybrid retrieval</div>
+  <p class="card-body">The paper proposes AMA-Agent with two mechanisms that directly target the identified failure modes. Instead of lossy compression, build a <span class="glossary" data-term="causality graph" data-def="A data structure where nodes are facts or events and directed edges represent 'A caused B' or 'A happened before B and affected it'. Preserves the reasoning chain that summarization destroys.">causality graph</span>. Instead of pure similarity search, use <strong>tool-augmented hybrid retrieval</strong>.</p>
+
+  <div class="arch-visual">
+    <div class="arch-flow">
+      <div class="arch-node input">
+        <h4>Agent Trajectory Input</h4>
+        <p>Raw stream of actions, observations, tool calls, state changes</p>
+      </div>
+      <div class="arch-connector"></div>
+      <div class="arch-node graph">
+        <h4>Causality Graph Construction</h4>
+        <p>Nodes = objective information units &middot; Edges = causal &amp; temporal dependencies</p>
+      </div>
+      <div class="arch-connector"></div>
+      <div class="arch-split">
+        <div class="arch-node" style="border-color:rgba(232,145,90,0.4)">
+          <h4 style="color:var(--accent-orange)">Graph Node Search</h4>
+          <p>Traverse causal links to find causally relevant context</p>
+        </div>
+        <div class="arch-node" style="border-color:rgba(91,141,239,0.4)">
+          <h4 style="color:var(--accent-blue)"><span class="glossary" data-term="BM25" data-def="A keyword-matching search algorithm — like a smarter version of grep. Finds exact word matches rather than semantic similarity. Fast and effective for keyword queries.">BM25</span> Keyword Search</h4>
+          <p>Lexical matching for specific factual lookups</p>
+        </div>
+      </div>
+      <div class="arch-merge-connector"></div>
+      <div class="arch-node output">
+        <h4>Hybrid Context Assembly</h4>
+        <p>Merged, deduplicated context &rarr; LLM generates answer</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="graph-demo">
+    <div class="graph-demo-header">
+      <div class="graph-label">Interactive: Build a causality graph</div>
+      <button class="btn btn-purple" id="buildBtn" onclick="buildGraph()">Build Graph &rarr;</button>
+    </div>
+    <svg id="causal-svg" viewBox="0 0 620 240" style="height:240px">
+      <!-- Populated by JS -->
+    </svg>
+    <div class="legend-row" style="margin-top:14px">
+      <div class="legend-item"><div class="legend-dot" style="background:#5b8def"></div>Action</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4ecb8d"></div>Observation</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#e8915a"></div>Tool Call</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>State Change</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Key Insight</div>
+    <p>The causality graph preserves what summarization destroys — the explicit causal chain between agent actions and outcomes. Hybrid retrieval solves the similarity mismatch by traversing causal edges rather than relying on <span class="glossary" data-term="cosine similarity" data-def="A measure of how similar two vectors are by the angle between them. Embedding-based retrieval uses this to find 'related' text chunks. Works well for documents; breaks down when relevance is causal, not semantic.">embedding cosine distance</span>. <strong>Together they address both failure modes simultaneously.</strong></p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CARD 6 · SO WHAT
+     ═══════════════════════════════════════ -->
+<div class="card card-sowhat">
+  <div class="card-num">06 &mdash; So What</div>
+  <div class="card-title">What this means if you're building agents</div>
+  <p class="card-body">Three implications for practitioners building agentic systems with long-horizon memory:</p>
+
+  <div class="takeaway-list">
+    <div class="takeaway-card" onclick="toggleCard(this)">
+      <div class="takeaway-header">
+        <div class="takeaway-num">1</div>
+        <div class="takeaway-main">
+          <h3>Don't assume <span class="glossary" data-term="RAG" data-def="Retrieval-Augmented Generation. Instead of feeding an entire document to an AI, you first search for relevant chunks and only give those to the model. Works great for documents; breaks down for agent trajectories.">RAG</span> transfers to agentic workflows</h3>
+          <p>Standard chunk-and-retrieve fails when the data is machine-generated trajectories.</p>
+          <div class="click-hint">click to expand &rarr;</div>
+        </div>
+      </div>
+      <div class="takeaway-detail">
+        RAG was designed for document retrieval — finding relevant passages from natural language text. Agent trajectories are <strong>structurally different</strong>: dense, objective, causally linked, and full of machine-generated tokens (JSON, SQL, API responses). If you're plugging off-the-shelf RAG into your agent's memory pipeline, you're almost certainly losing information that matters. At minimum, benchmark it against simply extending the context window.
+      </div>
+    </div>
+    <div class="takeaway-card" onclick="toggleCard(this)">
+      <div class="takeaway-header">
+        <div class="takeaway-num">2</div>
+        <div class="takeaway-main">
+          <h3>Preserve causal structure, not just content</h3>
+          <p>The chain of actions&rarr;observations&rarr;decisions matters more than any individual fact.</p>
+          <div class="click-hint">click to expand &rarr;</div>
+        </div>
+      </div>
+      <div class="takeaway-detail">
+        When an agent browses products, filters by price, compares reviews, and adds to cart — that's a <strong>causal chain</strong>. If your memory system stores the final selection but drops the reasoning path, the agent can't explain its choice, adapt to constraint changes, or answer "why" questions. Memory systems for agents need to be <strong>graph-structured and causality-aware</strong>, not flat key-value stores or embedding databases.
+      </div>
+    </div>
+    <div class="takeaway-card" onclick="toggleCard(this)">
+      <div class="takeaway-header">
+        <div class="takeaway-num">3</div>
+        <div class="takeaway-main">
+          <h3><span class="glossary" data-term="long-context baseline" data-def="The simplest possible approach: just feed the entire trajectory into the model's context window at once. No compression, no retrieval. Expensive, but surprisingly hard to beat.">Long context</span> is a stronger baseline than you think</h3>
+          <p>Before adding memory infrastructure, try just&hellip; extending the context.</p>
+          <div class="click-hint">click to expand &rarr;</div>
+        </div>
+      </div>
+      <div class="takeaway-detail">
+        GPT 5.2's 400K context window at <strong>72.3% accuracy</strong> outperforms every memory system tested. That doesn't mean context windows are the final answer — they have physical limits and cost/latency implications. But adding a memory layer that <em>reduces</em> accuracy below the long-context baseline is worse than doing nothing. <strong>Benchmark your memory system against the "just extend context" baseline before shipping it.</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end .card-stack -->
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-author">
+    <div class="footer-avatar">V</div>
+    <div>
+      <div class="footer-name">Vinny DeGenova</div>
+      <div class="footer-role">Visual Notes &middot; ML &amp; Systems</div>
+    </div>
+  </div>
+  <a href="https://arxiv.org/abs/2602.22769" target="_blank" rel="noopener" class="footer-link">arXiv 2602.22769 &rarr;</a>
+</footer>
+
+<!-- TOOLTIP -->
+<div id="tooltip"></div>
+
+<script>
+// ══════════════════════════════════════
+// INTERSECTION OBSERVER — card reveals
+// ══════════════════════════════════════
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('revealed');
+  });
+}, { threshold: 0.08 });
+
+document.querySelectorAll('.card').forEach(c => revealObs.observe(c));
+
+// ══════════════════════════════════════
+// TRAJECTORY STREAM
+// ══════════════════════════════════════
+const stream1Data = [
+  { type: 'action', text: 'search("red shoes")' },
+  { type: 'obs',    text: '→ 47 results' },
+  { type: 'tool',   text: 'filter(price<80)' },
+  { type: 'obs',    text: '→ 12 results' },
+  { type: 'action', text: 'compare(id:3, id:7)' },
+  { type: 'obs',    text: '{rating: 4.5 vs 4.2}' },
+  { type: 'state',  text: 'cart.add(id:3)' },
+];
+const stream2Data = [
+  { type: 'tool',   text: 'apply_coupon("SAVE10")' },
+  { type: 'obs',    text: '→ -$8.00 applied' },
+  { type: 'action', text: 'checkout.init()' },
+  { type: 'obs',    text: '{subtotal: $71.99}' },
+  { type: 'state',  text: 'order.status=pending' },
+  { type: 'tool',   text: 'payment.process()' },
+  { type: 'state',  text: 'order.confirmed' },
+];
+
+function buildStream(containerId, items) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  items.forEach((item, i) => {
+    if (i > 0) {
+      const arrow = document.createElement('span');
+      arrow.className = 'traj-arrow';
+      arrow.textContent = '→';
+      arrow.style.animationDelay = `${i * 0.14 + 0.05}s`;
+      el.appendChild(arrow);
+    }
+    const block = document.createElement('span');
+    block.className = `traj-block ${item.type}`;
+    block.textContent = item.text;
+    block.style.animationDelay = `${i * 0.14}s`;
+    el.appendChild(block);
+  });
+}
+
+buildStream('traj-stream-1', stream1Data);
+buildStream('traj-stream-2', stream2Data);
+
+function replayStream() {
+  buildStream('traj-stream-1', stream1Data);
+  buildStream('traj-stream-2', stream2Data);
+}
+
+// ══════════════════════════════════════
+// BAR CHART
+// ══════════════════════════════════════
+const chartData = [
+  { label: 'GPT 5.2 (400K)',  value: 72.3, type: 'context',  color: 'var(--accent-blue)' },
+  { label: 'Qwen2.5 1M',      value: 64.8, type: 'context',  color: 'var(--accent-blue)' },
+  { label: 'Claude (200K)',   value: 61.5, type: 'context',  color: 'var(--accent-blue)' },
+  { label: 'AMA-Agent',       value: 57.2, type: 'proposed', color: 'var(--accent-green)' },
+  { label: 'GraphRAG',        value: 48.1, type: 'memory',   color: 'var(--accent-orange)' },
+  { label: 'HippoRAG2',       value: 46.0, type: 'memory',   color: 'var(--accent-orange)' },
+  { label: 'BM25 RAG',        value: 44.3, type: 'memory',   color: 'var(--accent-orange)' },
+  { label: 'Mem0',            value: 41.7, type: 'memory',   color: 'var(--accent-orange)' },
+  { label: 'Embedding RAG',   value: 40.2, type: 'memory',   color: 'var(--accent-orange)' },
+  { label: 'Summarization',   value: 35.8, type: 'memory',   color: 'var(--accent-red)' },
+];
+const maxVal = 80;
+let chartAnimated = false;
+
+function buildChart() {
+  const container = document.getElementById('barChart');
+  container.innerHTML = '';
+  chartData.forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.dataset.type = d.type;
+    row.innerHTML = `
+      <div class="bar-label">${d.label}</div>
+      <div class="bar-track">
+        <div class="bar-fill" data-width="${(d.value / maxVal) * 100}" style="background:${d.color}"></div>
+      </div>
+      <div class="bar-value">${d.value}%</div>`;
+    container.appendChild(row);
+  });
+}
+buildChart();
+
+function animateBars() {
+  document.querySelectorAll('.bar-fill').forEach((bar, i) => {
+    setTimeout(() => { bar.style.width = bar.dataset.width + '%'; }, i * 55);
+  });
+}
+
+const chartObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting && !chartAnimated) {
+      chartAnimated = true;
+      animateBars();
+      chartObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.3 });
+chartObs.observe(document.querySelector('.chart-container'));
+
+function filterChart(type) {
+  document.querySelectorAll('.chart-filter').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-filter="${type}"]`).classList.add('active');
+  document.querySelectorAll('.bar-row').forEach(row => {
+    row.classList.toggle('dimmed', type !== 'all' && row.dataset.type !== type);
+  });
+}
+
+// ══════════════════════════════════════
+// STAT COUNTER ANIMATION
+// ══════════════════════════════════════
+let statsAnimated = false;
+
+function animateCounters() {
+  document.querySelectorAll('.stat-number[data-target]').forEach(el => {
+    const target = parseFloat(el.dataset.target);
+    const duration = 1200;
+    const start = performance.now();
+    function update(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = (target * eased).toFixed(1) + '%';
+      if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+  });
+}
+
+const statObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting && !statsAnimated) {
+      statsAnimated = true;
+      animateCounters();
+      statObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+statObs.observe(document.querySelector('.stat-row'));
+
+// ══════════════════════════════════════
+// EXPAND / COLLAPSE CARDS
+// ══════════════════════════════════════
+function toggleCard(card) {
+  card.classList.toggle('expanded');
+}
+
+// ══════════════════════════════════════
+// GLOSSARY TOOLTIPS
+// ══════════════════════════════════════
+const tooltip = document.getElementById('tooltip');
+
+document.querySelectorAll('.glossary').forEach(el => {
+  el.addEventListener('mouseenter', (e) => {
+    const term = el.dataset.term;
+    const def  = el.dataset.def;
+    tooltip.innerHTML = `<strong>${term}</strong>${def}`;
+    tooltip.classList.add('visible');
+    positionTooltip(e);
+  });
+  el.addEventListener('mousemove', positionTooltip);
+  el.addEventListener('mouseleave', () => {
+    tooltip.classList.remove('visible');
+  });
+});
+
+function positionTooltip(e) {
+  const margin = 12;
+  const tw = tooltip.offsetWidth  || 280;
+  const th = tooltip.offsetHeight || 80;
+  let x = e.clientX + margin;
+  let y = e.clientY + margin;
+  if (x + tw > window.innerWidth  - 8) x = e.clientX - tw - margin;
+  if (y + th > window.innerHeight - 8) y = e.clientY - th - margin;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+
+// ══════════════════════════════════════
+// CAUSALITY GRAPH DEMO
+// ══════════════════════════════════════
+const graphNodes = [
+  { id: 0, x: 65,  y: 120, label: 'search()', color: '#5b8def' },
+  { id: 1, x: 190, y: 52,  label: 'results', color: '#4ecb8d' },
+  { id: 2, x: 190, y: 188, label: 'filter()', color: '#e8915a' },
+  { id: 3, x: 315, y: 120, label: 'compare()', color: '#5b8def' },
+  { id: 4, x: 435, y: 52,  label: 'ratings', color: '#4ecb8d' },
+  { id: 5, x: 435, y: 188, label: '→ state', color: '#a78bfa' },
+  { id: 6, x: 555, y: 120, label: 'cart.add()', color: '#a78bfa' },
+];
+const graphEdges = [
+  [0, 1], [0, 2], [1, 3], [2, 3], [3, 4], [3, 5], [4, 6], [5, 6],
+];
+
+let graphBuilt = false;
+
+function buildGraph() {
+  if (graphBuilt) { resetGraph(); return; }
+  graphBuilt = true;
+
+  const btn = document.getElementById('buildBtn');
+  btn.disabled = true;
+
+  const svg = document.getElementById('causal-svg');
+  svg.innerHTML = '';
+
+  // Draw edges first (behind nodes)
+  const edgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  edgeGroup.id = 'edge-group';
+  svg.appendChild(edgeGroup);
+
+  const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  nodeGroup.id = 'node-group';
+  svg.appendChild(nodeGroup);
+
+  // Animate nodes appearing
+  graphNodes.forEach((node, i) => {
+    setTimeout(() => {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.style.opacity = '0';
+      g.style.transition = 'opacity 0.3s ease';
+
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', node.x);
+      circle.setAttribute('cy', node.y);
+      circle.setAttribute('r', '28');
+      circle.setAttribute('fill', node.color + '22');
+      circle.setAttribute('stroke', node.color);
+      circle.setAttribute('stroke-width', '1.5');
+      g.appendChild(circle);
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', node.x);
+      text.setAttribute('y', node.y + 3);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('fill', node.color);
+      text.setAttribute('font-family', 'JetBrains Mono, monospace');
+      text.setAttribute('font-size', '8.5');
+      text.textContent = node.label;
+      g.appendChild(text);
+
+      nodeGroup.appendChild(g);
+      requestAnimationFrame(() => { g.style.opacity = '1'; });
+
+      node.el = g;
+
+      // After all nodes appear, draw edges
+      if (i === graphNodes.length - 1) {
+        setTimeout(() => drawEdges(edgeGroup, btn), 200);
+      }
+    }, i * 120);
+  });
+}
+
+function drawEdges(edgeGroup, btn) {
+  graphEdges.forEach(([fromIdx, toIdx], i) => {
+    setTimeout(() => {
+      const from = graphNodes[fromIdx];
+      const to   = graphNodes[toIdx];
+
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const r = 28;
+      const x1 = from.x + (dx / dist) * r;
+      const y1 = from.y + (dy / dist) * r;
+      const x2 = to.x   - (dx / dist) * r;
+      const y2 = to.y   - (dy / dist) * r;
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', '#4ecb8d');
+      line.setAttribute('stroke-width', '1.2');
+      line.setAttribute('stroke-opacity', '0.5');
+      line.setAttribute('marker-end', 'url(#arrow)');
+      line.style.opacity = '0';
+      line.style.transition = 'opacity 0.3s ease';
+      edgeGroup.appendChild(line);
+      requestAnimationFrame(() => { line.style.opacity = '1'; });
+
+      if (i === graphEdges.length - 1) {
+        setTimeout(() => {
+          btn.textContent = 'Reset';
+          btn.disabled = false;
+        }, 300);
+      }
+    }, i * 100);
+  });
+
+  // Arrow marker def
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', 'arrow');
+  marker.setAttribute('markerWidth', '6');
+  marker.setAttribute('markerHeight', '6');
+  marker.setAttribute('refX', '5');
+  marker.setAttribute('refY', '3');
+  marker.setAttribute('orient', 'auto');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M0,0 L0,6 L6,3 z');
+  path.setAttribute('fill', '#4ecb8d');
+  path.setAttribute('opacity', '0.6');
+  marker.appendChild(path);
+  defs.appendChild(marker);
+  document.getElementById('causal-svg').insertBefore(defs, document.getElementById('causal-svg').firstChild);
+}
+
+function resetGraph() {
+  graphBuilt = false;
+  const svg = document.getElementById('causal-svg');
+  svg.innerHTML = '';
+  const btn = document.getElementById('buildBtn');
+  btn.textContent = 'Build Graph →';
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
