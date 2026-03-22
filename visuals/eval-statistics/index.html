@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Eval Score Is a Guess | Visual Notes</title>
+<meta name="description" content="Why point estimates are dangerous for AI evals and how confidence intervals should be the standard for measuring agentic system performance.">
+<meta property="og:title" content="Your Eval Score Is a Guess. Here's How to Know If You're Actually Improving.">
+<meta property="og:description" content="Why point estimates are dangerous for AI evals and how confidence intervals should be the standard for measuring agentic system performance.">
+<meta property="og:url" content="https://vdegenova.github.io/visual-notes/visuals/eval-statistics/">
+<meta property="og:type" content="article">
+<meta property="og:image" content="https://vdegenova.github.io/visual-notes/images/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Your Eval Score Is a Guess. Here's How to Know If You're Actually Improving.">
+<meta name="twitter:description" content="Why point estimates are dangerous for AI evals and how confidence intervals should be the standard for measuring agentic system performance.">
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0f1117;
+  --surface: #181a23;
+  --surface-2: #1e2030;
+  --border: #2a2d3e;
+  --text: #e2e4ed;
+  --text-dim: #8b8fa3;
+  --accent-blue: #5b8def;
+  --accent-green: #4ecb8d;
+  --accent-orange: #e8915a;
+  --accent-red: #ef6b6b;
+  --accent-cyan: #67d4e2;
+  --accent-purple: #a78bfa;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  line-height: 1.6;
+  padding: 48px 24px;
+  max-width: 680px;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+/* ── BACK LINK ── */
+.back-link {
+  display: inline-block;
+  margin-bottom: 32px;
+  font-size: 14px;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.back-link:hover { color: var(--accent-green); }
+
+/* ── HEADER ── */
+.header { margin-bottom: 40px; }
+.header-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-red);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.header h1 {
+  font-size: clamp(24px, 5vw, 34px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  margin-bottom: 14px;
+}
+.header-sub {
+  font-size: 16px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  max-width: 600px;
+  margin-bottom: 18px;
+}
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.tag.accent {
+  border-color: rgba(239, 107, 107, 0.4);
+  color: var(--accent-red);
+  background: rgba(239, 107, 107, 0.08);
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.card.revealed { opacity: 1; transform: translateY(0); }
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+
+.card-problem::before  { background: var(--accent-red); }
+.card-scenario::before { background: var(--accent-orange); }
+.card-infra::before    { background: var(--accent-blue); }
+.card-fix::before      { background: var(--accent-green); }
+.card-viz::before      { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+.card-math::before     { background: var(--accent-cyan); }
+.card-closing::before  { background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); }
+
+.card-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.card-problem  .card-num { color: var(--accent-red); }
+.card-scenario .card-num { color: var(--accent-orange); }
+.card-infra    .card-num { color: var(--accent-blue); }
+.card-fix      .card-num { color: var(--accent-green); }
+.card-viz      .card-num { color: var(--accent-cyan); }
+.card-math     .card-num { color: var(--accent-cyan); }
+.card-closing  .card-num { color: var(--accent-purple); }
+
+.card-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin-bottom: 6px;
+}
+.card-body {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.card-body + .card-body { margin-top: 10px; }
+.card-body strong { color: var(--text); font-weight: 600; }
+
+/* ── CONNECTOR ── */
+.connector-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 0;
+}
+.connector-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: var(--surface-2);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  text-align: center;
+  line-height: 1.4;
+}
+.connector-text .arrow-down { color: var(--accent-green); font-size: 14px; }
+
+/* ── CARD STACK ── */
+.card-stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* ── FAKE EVAL DISPLAY ── */
+.eval-display {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 16px;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+}
+.eval-score {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--accent-red);
+  line-height: 1;
+}
+.eval-score-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+.eval-vs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.eval-vs-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.eval-vs-label { font-size: 11px; color: var(--text-dim); }
+.eval-vs-num { font-size: 20px; font-weight: 600; }
+.eval-vs-num.a { color: var(--accent-cyan); }
+.eval-vs-num.b { color: var(--accent-purple); }
+/* ── SCENARIO ITEMS ── */
+.scenario-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scenario-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.scenario-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.scenario-icon {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-orange);
+  background: rgba(232, 145, 90, 0.12);
+  border: 1px solid rgba(232, 145, 90, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+.scenario-item-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.scenario-item-body {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ── CI EXPLORER ── */
+.ci-explorer {
+  margin-top: 16px;
+}
+.ci-chart {
+  position: relative;
+  padding: 20px 0 40px 0;
+}
+.ci-chart svg {
+  width: 100%;
+  overflow: visible;
+}
+.ci-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+.ci-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ci-slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.ci-slider-label span:first-child {
+  color: var(--text-dim);
+}
+.ci-slider-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+.ci-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  outline: none;
+}
+.ci-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 6px rgba(103, 212, 226, 0.3);
+}
+.ci-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 6px rgba(103, 212, 226, 0.3);
+}
+
+.ci-verdict {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ci-verdict-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.ci-verdict.warning {
+  background: rgba(232, 145, 90, 0.08);
+  border: 1px solid rgba(232, 145, 90, 0.3);
+  color: var(--accent-orange);
+}
+.ci-verdict.success {
+  background: rgba(78, 203, 141, 0.08);
+  border: 1px solid rgba(78, 203, 141, 0.3);
+  color: var(--accent-green);
+}
+.ci-verdict-text strong {
+  font-weight: 600;
+}
+.ci-verdict-detail {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+/* ── MATH BREAKDOWN ── */
+.math-steps {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.math-step {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.math-step-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-blue);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.math-formula {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.math-gloss {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ── RESULTS TABLE ── */
+.results-table {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.results-table thead th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.results-table tbody td {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.results-table tbody tr:last-child td { border-bottom: none; }
+.results-table .model-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+.results-table .model-a { color: var(--accent-cyan); }
+.results-table .model-b { color: var(--accent-purple); }
+.results-table .mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.range-pill {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.range-pill.a {
+  color: var(--accent-cyan);
+  border-color: rgba(103, 212, 226, 0.3);
+}
+.range-pill.b {
+  color: var(--accent-purple);
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+/* ── FOOTER ── */
+.footer {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.footer-author { display: flex; align-items: center; gap: 10px; }
+.footer-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bg);
+}
+.footer-name  { font-size: 14px; font-weight: 600; }
+.footer-role  { font-size: 12px; color: var(--text-dim); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 480px) {
+  body { padding: 32px 16px; }
+  .card { padding: 20px; }
+  .eval-vs { flex-wrap: wrap; gap: 10px; }
+  .results-table { font-size: 12px; }
+  .results-table thead th { font-size: 10px; padding: 6px 6px; }
+  .results-table tbody td { padding: 8px 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- BACK LINK -->
+<a class="back-link" href="../../">&larr; Visual Notes</a>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-label">Statistical Rigor in AI Evals</div>
+  <h1>Your eval score is a guess. Here's how to know if you're actually improving.</h1>
+  <p class="header-sub">Every eval score comes from a finite sample. That means it has a margin of error&mdash;usually wider than the differences people use to make decisions.</p>
+  <div class="tags">
+    <span class="tag accent">confidence intervals</span>
+    <span class="tag">evals</span>
+    <span class="tag">agentic systems</span>
+    <span class="tag">statistics</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- INTERACTIVE — HERO POSITION        -->
+<!-- ═══════════════════════════════════ -->
+
+<div class="card card-viz" style="opacity:1;transform:none;">
+  <div class="card-num">Explore</div>
+  <div class="card-title">Can you tell these two models apart?</div>
+  <div class="card-body">Two models scored differently on your eval. Move the sliders to change the gap between them and the number of test examples. Watch what happens to the confidence intervals.</div>
+
+  <div class="ci-explorer">
+    <div class="ci-chart">
+      <svg id="ciSvg" viewBox="0 0 600 160" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="ci-controls">
+      <div class="ci-slider-group">
+        <div class="ci-slider-label">
+          <span>Score gap between models</span>
+          <span class="ci-slider-value" id="gapValue">0.3%</span>
+        </div>
+        <input type="range" class="ci-slider" id="gapSlider" min="0.1" max="10" step="0.1" value="0.3">
+      </div>
+      <div class="ci-slider-group">
+        <div class="ci-slider-label">
+          <span>Number of test examples</span>
+          <span class="ci-slider-value" id="nValue">200</span>
+        </div>
+        <input type="range" class="ci-slider" id="nSlider" min="30" max="2000" step="10" value="200">
+      </div>
+    </div>
+
+    <div class="ci-verdict warning" id="ciVerdict">
+      <span class="ci-verdict-icon"></span>
+      <div class="ci-verdict-text"></div>
+    </div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> what's actually happening here</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- THE PROBLEM                        -->
+<!-- ═══════════════════════════════════ -->
+
+<div class="card card-problem">
+  <div class="card-num">The Problem</div>
+  <div class="card-title">Point estimates hide how little you know</div>
+  <div class="card-body">You run your eval. 68.2% accuracy. You change something, run it again. 67.9%. You pick the higher number.</div>
+  <div class="card-body">Both numbers are estimates from a sample. If you ran a different sample of the same size, you'd get different numbers. The true performance of each variant is somewhere in a range around what you measured&mdash;and with typical eval set sizes, that range is <strong>much wider than people expect</strong>.</div>
+
+  <div class="eval-display">
+    <div class="eval-vs">
+      <div class="eval-vs-item">
+        <span class="eval-vs-label">Version A</span>
+        <span class="eval-vs-num a">68.2%</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);">vs</div>
+      <div class="eval-vs-item">
+        <span class="eval-vs-label">Version B</span>
+        <span class="eval-vs-num b">67.9%</span>
+      </div>
+    </div>
+    <div class="eval-score-sub" style="margin-top:12px;">On 200 examples, A's 95% CI is roughly 62&ndash;74%. B's is roughly 61&ndash;74%. These ranges almost completely overlap.</div>
+  </div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> where this shows up</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- WHERE IT SHOWS UP                  -->
+<!-- ═══════════════════════════════════ -->
+
+<div class="card card-scenario">
+  <div class="card-num">In Practice</div>
+  <div class="card-title">This comes up constantly in agentic work</div>
+  <div class="card-body">Any time you change a component and re-run evals, this applies. Three common cases:</div>
+
+  <div class="scenario-list">
+    <div class="scenario-item">
+      <div class="scenario-item-header">
+        <span class="scenario-icon">01</span>
+        <span class="scenario-item-title">Model swap</span>
+      </div>
+      <div class="scenario-item-body">Switching from GPT-5.4 to Sonnet 4.6, or comparing two checkpoints of the same model. The eval set is finite. A 0.5% difference could just be which examples happened to be in your test split.</div>
+    </div>
+    <div class="scenario-item">
+      <div class="scenario-item-header">
+        <span class="scenario-icon">02</span>
+        <span class="scenario-item-title">Prompt change</span>
+      </div>
+      <div class="scenario-item-body">You rewrote the system prompt or added chain-of-thought. The score moved a point. On 100 examples, the 95% margin of error for a 68% score is &plusmn;9 percentage points. One point is well inside the noise.</div>
+    </div>
+    <div class="scenario-item">
+      <div class="scenario-item-header">
+        <span class="scenario-icon">03</span>
+        <span class="scenario-item-title">Tool addition</span>
+      </div>
+      <div class="scenario-item-body">You gave the agent web search or a new API. Task completion went up 2 points on 150 examples. The margin of error at that sample size is about &plusmn;7.5%. You can't distinguish that 2-point gain from noise.</div>
+    </div>
+  </div>
+
+  <div class="card-body" style="margin-top:16px;">Same underlying issue every time: a single number from a finite sample doesn't carry enough information to compare two things.</div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> it's not just individual decisions</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- THE INFRASTRUCTURE GAP             -->
+<!-- ═══════════════════════════════════ -->
+
+<div class="card card-infra">
+  <div class="card-num">Beyond One-Off Comparisons</div>
+  <div class="card-title">This applies to your eval pipeline too</div>
+  <div class="card-body">If you're running evals on a regular cadence&mdash;on every commit, nightly, or as part of a release gate&mdash;the same thing applies. Each run produces a score from a finite sample, and the variance between runs can easily mask or manufacture trends.</div>
+  <div class="card-body">A regression dashboard that shows score dropping from 71.3% to 69.8% across two nightly runs looks like something broke. But if the 95% interval on both runs is &plusmn;6 points, that movement is well within normal fluctuation. Without intervals, you're either chasing false regressions or missing real ones.</div>
+  <div class="card-body">Whether you already have this infrastructure or you're building it, <strong>baking confidence intervals into the pipeline output</strong> is what turns eval scores into something you can actually make decisions on.</div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> what to do instead</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- WHAT TO DO                         -->
+<!-- ═══════════════════════════════════ -->
+
+<div class="card card-fix">
+  <div class="card-num">What To Do</div>
+  <div class="card-title">Report confidence intervals</div>
+  <div class="card-body">Two things make this tractable: <strong>enough eval examples</strong> (200&ndash;500+ for typical pass/fail evals) and <strong>reporting the interval</strong> instead of just the point estimate.</div>
+  <div class="card-body">A confidence interval gives you the range where the true performance likely falls. If two models' intervals overlap, the measured difference is within the noise&mdash;you don't have evidence that one is better. If the intervals are separated, you do.</div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> the calculation</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- MATH BREAKDOWN                     -->
+<!-- ═══════════════════════════════════ -->
+
+<div class="card card-math">
+  <div class="card-num">How It Works</div>
+  <div class="card-title">Three lines of math</div>
+
+  <div class="math-steps">
+    <div class="math-step">
+      <div class="math-step-num">Step 1 &mdash; Standard Error</div>
+      <div class="math-formula">SE = std / &radic;n</div>
+      <div class="math-gloss">How much the measured score would vary if you re-ran the eval on a different sample of the same size. For binary (pass/fail) evals, std = &radic;(p&middot;(1&minus;p)), so this is fully determined by the score and sample size.</div>
+    </div>
+    <div class="math-step">
+      <div class="math-step-num">Step 2 &mdash; Margin of Error</div>
+      <div class="math-formula">margin = 1.96 &times; SE</div>
+      <div class="math-gloss">Multiplying by 1.96 gives a 95% confidence interval&mdash;if you repeated this eval 100 times, roughly 95 of those intervals would contain the true score. Standard choice; nothing magic about it.</div>
+    </div>
+    <div class="math-step">
+      <div class="math-step-num">Step 3 &mdash; The Interval</div>
+      <div class="math-formula">CI = score &plusmn; margin</div>
+      <div class="math-gloss">The score becomes a range. Compare the ranges, not the point estimates.</div>
+    </div>
+  </div>
+
+  <table class="results-table" id="resultsTable">
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th>Score</th>
+        <th>Low</th>
+        <th>High</th>
+        <th>Range</th>
+      </tr>
+    </thead>
+    <tbody id="resultsBody"></tbody>
+  </table>
+
+  <div class="card-body" style="margin-top:14px;">These values update live with the explorer above. Scroll back up and move the sliders to see the table change.</div>
+</div>
+
+<div class="connector-row">
+  <div class="connector-text"><span class="arrow-down">&#8595;</span> why agents make this harder</div>
+</div>
+
+<!-- ═══════════════════════════════════ -->
+<!-- CLOSING                            -->
+<!-- ═══════════════════════════════════ -->
+
+<div class="card card-closing">
+  <div class="card-num">For Agentic Systems</div>
+  <div class="card-title">Higher variance means wider intervals</div>
+  <div class="card-body">Classification tasks have relatively low per-example variance. Agentic tasks don't&mdash;a coding agent might solve something via three different paths, a research agent might get lucky on its first search. Run-to-run variance is higher, which means <strong>confidence intervals are wider at the same sample size</strong>.</div>
+  <div class="card-body">Most agentic benchmarks report results on 50&ndash;200 examples with no error bars. At n=100 with a 65% score, the 95% CI is roughly &plusmn;9 points. That's a range from 56% to 74%. Claiming one system beats another by 2 points in that regime is not a meaningful statement.</div>
+  <div class="card-body">The practical takeaway: <strong>report intervals, not points</strong>. If your intervals overlap, either collect more data or accept that you can't distinguish the two variants yet. Calibrated confidence beats false precision.</div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-author">
+    <div class="footer-avatar">V</div>
+    <div>
+      <div class="footer-name">Vinny DeGenova</div>
+      <div class="footer-role">Visual Notes &middot; ML &amp; Systems</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ══════════════════════════════════════
+// INTERSECTION OBSERVER — card reveals
+// ══════════════════════════════════════
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) e.target.classList.add('revealed');
+  });
+}, { threshold: 0.08 });
+
+document.querySelectorAll('.card').forEach(c => revealObs.observe(c));
+
+// ══════════════════════════════════════
+// CONFIDENCE INTERVAL EXPLORER
+// ══════════════════════════════════════
+const gapSlider = document.getElementById('gapSlider');
+const nSlider   = document.getElementById('nSlider');
+const gapValue  = document.getElementById('gapValue');
+const nValue    = document.getElementById('nValue');
+const ciVerdict = document.getElementById('ciVerdict');
+const svg       = document.getElementById('ciSvg');
+
+const BASE_SCORE = 68.0;
+const ASSUMED_STD = 47.0; // std for binary (pass/fail) at ~68% ≈ sqrt(0.68*0.32)*100
+
+function computeCI(score, n) {
+  const p = score / 100;
+  const std = Math.sqrt(p * (1 - p)) * 100;
+  const se = std / Math.sqrt(n);
+  const margin = 1.96 * se;
+  return { score, se, margin, low: score - margin, high: score + margin };
+}
+
+function updateViz() {
+  const gap = parseFloat(gapSlider.value);
+  const n   = parseInt(nSlider.value);
+
+  gapValue.textContent = gap.toFixed(1) + '%';
+  nValue.textContent   = n;
+
+  const scoreA = BASE_SCORE + gap / 2;
+  const scoreB = BASE_SCORE - gap / 2;
+
+  const a = computeCI(scoreA, n);
+  const b = computeCI(scoreB, n);
+
+  // Determine display range
+  const minVal = Math.min(a.low, b.low) - 2;
+  const maxVal = Math.max(a.high, b.high) + 2;
+
+  const svgW = 600;
+  const svgH = 160;
+  const padL = 10;
+  const padR = 10;
+  const chartW = svgW - padL - padR;
+
+  function x(val) {
+    return padL + ((val - minVal) / (maxVal - minVal)) * chartW;
+  }
+
+  const yA = 40;
+  const yB = 90;
+  const axisY = 135;
+  const barH = 8;
+
+  let svgContent = '';
+
+  // Overlap zone
+  const overlapLow  = Math.max(a.low, b.low);
+  const overlapHigh = Math.min(a.high, b.high);
+  const hasOverlap  = overlapLow < overlapHigh;
+
+  if (hasOverlap) {
+    const ox1 = x(overlapLow);
+    const ox2 = x(overlapHigh);
+    svgContent += `<rect x="${ox1}" y="${yA - barH/2 - 4}" width="${ox2 - ox1}" height="${yB - yA + barH + 8}" rx="4" fill="rgba(232,145,90,0.1)" stroke="rgba(232,145,90,0.3)" stroke-width="1" stroke-dasharray="4,3"/>`;
+    const omx = (ox1 + ox2) / 2;
+    svgContent += `<text x="${omx}" y="${(yA + yB) / 2 + 4}" text-anchor="middle" fill="#e8915a" font-family="JetBrains Mono,monospace" font-size="10" font-weight="600">OVERLAP</text>`;
+  }
+
+  // Draw CI bar helper
+  function drawBar(ci, y, color, label) {
+    const xLow  = x(ci.low);
+    const xHigh = x(ci.high);
+    const xMid  = x(ci.score);
+
+    // Bar line
+    svgContent += `<line x1="${xLow}" y1="${y}" x2="${xHigh}" y2="${y}" stroke="${color}" stroke-width="3" stroke-linecap="round" opacity="0.5"/>`;
+    // Caps
+    svgContent += `<line x1="${xLow}" y1="${y-6}" x2="${xLow}" y2="${y+6}" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`;
+    svgContent += `<line x1="${xHigh}" y1="${y-6}" x2="${xHigh}" y2="${y+6}" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`;
+    // Point estimate dot
+    svgContent += `<circle cx="${xMid}" cy="${y}" r="5" fill="${color}"/>`;
+
+    // Labels
+    svgContent += `<text x="${xLow}" y="${y - 12}" text-anchor="middle" fill="${color}" font-family="JetBrains Mono,monospace" font-size="10" opacity="0.8">${ci.low.toFixed(1)}</text>`;
+    svgContent += `<text x="${xHigh}" y="${y - 12}" text-anchor="middle" fill="${color}" font-family="JetBrains Mono,monospace" font-size="10" opacity="0.8">${ci.high.toFixed(1)}</text>`;
+    svgContent += `<text x="${xMid}" y="${y + 18}" text-anchor="middle" fill="${color}" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">${ci.score.toFixed(1)}%</text>`;
+
+    // Model label
+    const labelX = xLow - 8;
+    svgContent += `<text x="${labelX}" y="${y + 4}" text-anchor="end" fill="${color}" font-family="JetBrains Mono,monospace" font-size="11" font-weight="600">${label}</text>`;
+
+    // Dashed guide lines to axis
+    svgContent += `<line x1="${xLow}" y1="${y + 6}" x2="${xLow}" y2="${axisY - 8}" stroke="${color}" stroke-width="1" stroke-dasharray="3,3" opacity="0.3"/>`;
+    svgContent += `<line x1="${xHigh}" y1="${y + 6}" x2="${xHigh}" y2="${axisY - 8}" stroke="${color}" stroke-width="1" stroke-dasharray="3,3" opacity="0.3"/>`;
+  }
+
+  drawBar(a, yA, '#67d4e2', 'A');
+  drawBar(b, yB, '#a78bfa', 'B');
+
+  // X-axis
+  svgContent += `<line x1="${padL}" y1="${axisY}" x2="${svgW - padR}" y2="${axisY}" stroke="var(--border)" stroke-width="1"/>`;
+
+  // Axis ticks
+  const tickStep = (maxVal - minVal) > 20 ? 5 : (maxVal - minVal) > 10 ? 2 : 1;
+  const firstTick = Math.ceil(minVal / tickStep) * tickStep;
+  for (let v = firstTick; v <= maxVal; v += tickStep) {
+    const tx = x(v);
+    svgContent += `<line x1="${tx}" y1="${axisY}" x2="${tx}" y2="${axisY + 5}" stroke="var(--border)" stroke-width="1"/>`;
+    svgContent += `<text x="${tx}" y="${axisY + 16}" text-anchor="middle" fill="var(--text-dim)" font-family="JetBrains Mono,monospace" font-size="9">${v.toFixed(0)}%</text>`;
+  }
+
+  svg.innerHTML = svgContent;
+
+  // Verdict
+  if (hasOverlap) {
+    ciVerdict.className = 'ci-verdict warning';
+    ciVerdict.innerHTML = `
+      <span class="ci-verdict-icon">&#9888;</span>
+      <div class="ci-verdict-text">
+        <strong>Can't tell which is better&mdash;this could be noise.</strong>
+        <div class="ci-verdict-detail">A: ${a.low.toFixed(1)}%&ndash;${a.high.toFixed(1)}% overlaps with B: ${b.low.toFixed(1)}%&ndash;${b.high.toFixed(1)}%</div>
+      </div>`;
+  } else {
+    ciVerdict.className = 'ci-verdict success';
+    ciVerdict.innerHTML = `
+      <span class="ci-verdict-icon">&#10003;</span>
+      <div class="ci-verdict-text">
+        <strong>Genuinely distinguishable&mdash;you can trust this result.</strong>
+        <div class="ci-verdict-detail">A: ${a.low.toFixed(1)}%&ndash;${a.high.toFixed(1)}% is fully separated from B: ${b.low.toFixed(1)}%&ndash;${b.high.toFixed(1)}%</div>
+      </div>`;
+  }
+
+  // Update results table
+  updateTable(a, b);
+}
+
+function updateTable(a, b) {
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = `
+    <tr>
+      <td><span class="model-label model-a">Model A</span></td>
+      <td class="mono">${a.score.toFixed(1)}%</td>
+      <td class="mono">${a.low.toFixed(1)}%</td>
+      <td class="mono">${a.high.toFixed(1)}%</td>
+      <td><span class="range-pill a">${a.low.toFixed(1)}&ndash;${a.high.toFixed(1)}%</span></td>
+    </tr>
+    <tr>
+      <td><span class="model-label model-b">Model B</span></td>
+      <td class="mono">${b.score.toFixed(1)}%</td>
+      <td class="mono">${b.low.toFixed(1)}%</td>
+      <td class="mono">${b.high.toFixed(1)}%</td>
+      <td><span class="range-pill b">${b.low.toFixed(1)}&ndash;${b.high.toFixed(1)}%</span></td>
+    </tr>`;
+}
+
+gapSlider.addEventListener('input', updateViz);
+nSlider.addEventListener('input', updateViz);
+
+// Initial render
+updateViz();
+</script>
+
+</body>
+</html>
